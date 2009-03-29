@@ -1,0 +1,70 @@
+#!/usr/bin/env python
+
+from __future__ import absolute_import
+import os, sys, unittest
+from optparse import OptionParser
+from md import test
+
+def optparser():
+    parser = OptionParser(usage='usage: %prog [options] module ...')
+    parser.add_option(
+	'-v', action='count', dest='verbosity', default=0,
+	help='Verbosity.'
+    )
+    parser.add_option(
+	'--doc-ext', action='store', dest='docext',
+	default=', '.join(test.DOCTEST_EXT),
+	help='Doctest filename extensions'
+    )
+    parser.add_option(
+	'--doc-folders', action='store', dest='docfolders',
+	default=', '.join(test.DOCTEST_FOLDERS),
+	help=('Folders relative to the top-level package in which'
+	      ' to search for doctest files')
+    )
+    parser.add_option(
+	'--unit-ext', action='append', dest='unitext',
+	default=', '.join(test.UNITTEST_EXT),
+	help='Doctest filename extensions'
+    )
+    return parser
+
+def comma_list(name, options=None):
+    """Split comma-separated items into items.  If options is None,
+    look for name in os.environ.
+
+    >>> comma_list('FOO', 'foo, bar')
+    ['foo', 'bar']
+    """
+    if options is None and name in os.environ:
+	options = (os.environ[name],)
+    return options and [o.strip() for o in options.split(',')]
+
+def run_tests(mod_names, verbosity, **kwargs):
+    tests = unittest.TestSuite()
+    for name in mod_names:
+	tests.addTest(test.pkg_suite(name, **kwargs))
+    runner = unittest.TextTestRunner(descriptions=1, verbosity=verbosity)
+    return runner.run(tests)
+
+def main():
+    parser = optparser()
+    opt, mod_names = parser.parse_args()
+
+    if not mod_names:
+	parser.print_usage()
+	sys.exit(1)
+    else:
+	docfolders = comma_list('DOCTEST_FOLDERS', opt.docfolders)
+	docext = comma_list('DOCTEST_EXT', opt.docext)
+	unitext = comma_list('UNITTEST_EXT', opt.unitext)
+
+	result = run_tests(
+	    mod_names, opt.verbosity,
+	    docfolders=docfolders, docext=docext, unitext=unitext
+	)
+
+	sys.exit(not result.wasSuccessful())
+
+if __name__ == '__main__':
+    main()

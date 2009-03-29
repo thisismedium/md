@@ -1,2 +1,3 @@
 *.py?
 docs/.build
+*.egg-info

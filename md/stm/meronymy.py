@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 from md import fluid
-from .interfces import Cursor
+from .interfaces import Cursor
 from .log import weaklog
 
 __all__ = ('partof', 'whole')
@@ -26,10 +26,7 @@ def current_meronymy():
 def resolve_whole(meronymy, parts, default=None):
     return ((p, meronymy.get(p, default)) for p in parts)
 
-def fast_register_part(meronymy, whole, part):
-    meronymy[part] = meronymy.get(whole, whole)
-
-def checked_register_part(meronymy, whole, part):
+def register_part(meronymy, whole, part):
     ## Resolve whole to a real whole if it is part of something else.
     whole = meronymy.get(whole, whole)
 
@@ -50,5 +47,3 @@ def checked_register_part(meronymy, whole, part):
 		'%r is already part of %r '
 		'(not whole=%r)' % (part, meronomy[part], whole)
 	    )
-
-register_part = fast_register_part if __optimize__ else checked_register_part
