@@ -5,4 +5,6 @@ from md import test
 __all__ = ('all', )
 
 def all():
-    return test.pkg_suites('md', __name__)
+    suite = test.pkg_suites('md', docprefix='')
+    suite.addTests(test.module_suites(__name__))
+    return suite

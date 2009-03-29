@@ -2,7 +2,7 @@ from __future__ import absolute_import
 import unittest, doctest, sys, inspect, os, glob, functools
 from os import path
 
-__all__ = ('pkg_suite', 'pkg_suites')
+__all__ = ('pkg_suite', 'pkg_suites', 'module_suites', 'docfile_suites')
 
 ## TEST_FOLDERS are relative to top_level_dirname()
 
@@ -19,22 +19,23 @@ DOCTEST_OPTIONS = (
 )
 
 
-### Construct Suites
+### High-level suite construction
 
 def pkg_suites(*names, **kwargs):
     suites = (pkg_suite(n, **kwargs) for n in names)
     return unittest.TestSuite(have_tests(suites))
 
 def pkg_suite(
-    name, docfolders=DOCTEST_FOLDERS, docext=DOCTEST_EXT,
+    name, docprefix=None, docfolders=DOCTEST_FOLDERS, docext=DOCTEST_EXT,
     optionflags=DOCTEST_OPTIONS, unitext=UNITTEST_EXT
 ):
     result = unittest.TestSuite()
 
     mod = module(name)
-    result.addTests(docfile_suites(mod, docfolders, docext, optionflags))
-    result.addTests(doctest_suites(mod, docext, optionflags))
-    result.addTests(unittest_suites(mod, unitext))
+    result.addTests(
+	docfile_suites(mod, docprefix, docfolders, docext, optionflags)
+    )
+    result.addTests(module_suites(mod, unitext, docext, optionflags))
 
     return result
 
@@ -47,51 +48,37 @@ def have_tests(suites):
     return (s for s in suites if s and s._tests)
 
 @suites
-def doctest_suites(mod, docext=DOCTEST_EXT, optionflags=DOCTEST_OPTIONS):
+def module_suites(
+    mod, unitext=UNITTEST_EXT, docext=DOCTEST_EXT,
+    optionflags=DOCTEST_OPTIONS
+):
+    mod = module(mod)
     if is_package(mod):
 	base = path.dirname(mod.__file__)
-
-	yield docfile_suite(
-	    (p for (p, n, e) in candidates(base, docext)),
-	    optionflags
-	)
-
-	for (filename, name, ext) in candidates(base, ('.py', )):
-	    qualified = join_module_names(mod.__name__, name)
-	    yield doctest_suite(qualified, optionflags)
+	prefix = mod.__name__
+	yield docfile_suite(file_candidates(base, prefix, docext), optionflags)
+	for mod in module_candidates(base, prefix, unitext):
+	    yield doctest_suite(mod, optionflags)
+	    yield unittest_suite(mod)
     else:
 	yield doctest_suite(mod, optionflags)
+	yield unittest_suite(mod)
 
 @suites
 def docfile_suites(
-    mod, folders=DOCTEST_FOLDERS,
+    mod, prefix=None, folders=DOCTEST_FOLDERS,
     ext=DOCTEST_EXT, optionflags=DOCTEST_OPTIONS
 ):
     mod = module(mod)
     project = top_level_dirname(mod)
+    prefix = mod.__name__ if prefix is None else prefix
 
     for folder in find_test_folders(project, folders):
-	yield docfile_suite(
-	    (p for (p, n, e) in candidates(folder, ext)
-	     if n.startswith(mod.__name__)),
-	    optionflags
-	)
+	yield docfile_suite(file_candidates(folder, prefix, ext), optionflags)
 
     if is_package(mod):
-	yield docfile_suite(
-	    (p for (p, n, e) in candidates(path.dirname(mod.__file__), ext)),
-	    optionflags
-	)
-
-@suites
-def unittest_suites(mod, ext=UNITTEST_EXT):
-    if is_package(mod):
-	base = path.dirname(mod.__file__)
-	for (filename, name, ext) in candidates(base, ext):
-	    qualified = join_module_names(mod.__name__, name)
-	    yield unittest_suite(qualified)
-    else:
-	yield unittest_suite(mod)
+	folder = path.dirname(mod.__file__)
+	yield docfile_suite(file_candidates(folder, '', ext), optionflags)
 
 
 ### tests
@@ -126,6 +113,21 @@ def unittest_suite(mod):
 
 ### Utility
 
+def file_candidates(base, prefix, match_ext):
+    return (
+	p for (p, n) in candidates(base, match_ext)
+	if n.startswith(prefix)
+    )
+
+def module_candidates(base, prefix, match_ext):
+    for (filename, name) in candidates(base, match_ext):
+	if name == '__init__':
+	    yield prefix
+	elif name.endswith('__init__'):
+	    name = name[:-9]
+	if name.startswith(prefix):
+	    yield '.'.join((prefix, name.replace('/', '.'))).strip('.')
+
 def candidates(base, match_ext):
     chop = len(base) + 1
     for (dirpath, dirnames, filenames) in os.walk(base):
@@ -133,9 +135,9 @@ def candidates(base, match_ext):
 	    qualified = path.join(dirpath, filename)
 	    (name, ext) = path.splitext(qualified)
 	    if ext in match_ext:
-		name = name[chop:]
-		if not name.startswith('.'):
-		    yield (qualified, name.replace('/', '.'), ext)
+		relative = name[chop:]
+		if not relative.startswith('.'):
+		    yield (qualified, relative)
 
 def module(name):
     """Return the module associated with name, importing it if
@@ -172,7 +174,3 @@ def find_test_folders(base, folders):
 	dirname = path.realpath(path.join(base, folder))
 	if path.exists(dirname):
 	    yield dirname
-
-def join_module_names(base, name):
-    name = name[:-9] if name.endswith('__init__') else name
-    return '.'.join((base, name)) if name else base
