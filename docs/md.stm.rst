@@ -297,3 +297,28 @@ Transactions
       >>> c2.value
       <sequence ['Z', 'B', 'c']>
 
+Persistence
+-----------
+
+Pickling is supported by the default :class:`cursor` through
+:mod:`copy_reg`.  A :class:`cursor` does not have a built-in
+persistent identity; dumping and loading a cursor produces a copy.
+Subclasses of :class:`cursor` may override :meth:`__getstate__` to
+specialize the state that is reduced; by default ``readable(self)`` is
+returned.  Pickling a :class:`cursor` in the middle of a transaction
+could lead to unexpected results if the cursor is unsaved or the
+transaction is uncommitted.
+
+>>> from cPickle import dumps, loads
+
+>>> with transaction(autosave=True):
+...     o1 = cursor(); o2 = cursor()
+...     o1.foo = o2
+...     o2.bar = 1
+
+>>> o3 = loads(dumps(o1, -1))
+>>> o3 is not o1; o3.foo is not o2; o3.foo.bar
+True
+True
+1
+

@@ -2,6 +2,11 @@
  Fluid Bindings
 ================
 
+Database Connection
+-------------------
+
+See :doc:`../md.fluid` for an example of a fluid database connection.
+
 Fluid :func:`print`
 -------------------
 
