@@ -69,7 +69,7 @@ def unsaved():
 
 ### Journal
 
-CURRENT_JOURNAL = fluid.cell(None)
+CURRENT_JOURNAL = fluid.cell(None, type=fluid.private)
 
 @fluid.accessor(None)
 def current_journal():
