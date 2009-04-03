@@ -1,4 +1,5 @@
 from __future__ import absolute_import
+from importlib import import_module
 import unittest, doctest, sys, inspect, os, glob, functools
 from os import path
 
@@ -19,7 +20,7 @@ DOCTEST_OPTIONS = (
 )
 
 
-### High-level suite construction
+### Suites
 
 def pkg_suites(*names, **kwargs):
     suites = (pkg_suite(n, **kwargs) for n in names)
@@ -32,10 +33,10 @@ def pkg_suite(
     result = unittest.TestSuite()
 
     mod = module(name)
+    result.addTests(module_suites(mod, unitext, docext, optionflags))
     result.addTests(
 	docfile_suites(mod, docprefix, docfolders, docext, optionflags)
     )
-    result.addTests(module_suites(mod, unitext, docext, optionflags))
 
     return result
 
@@ -56,7 +57,6 @@ def module_suites(
     if is_package(mod):
 	base = path.dirname(mod.__file__)
 	prefix = mod.__name__
-	yield docfile_suite(file_candidates(base, prefix, docext), optionflags)
 	for mod in module_candidates(base, prefix, unitext):
 	    yield doctest_suite(mod, optionflags)
 	    yield unittest_suite(mod)
@@ -81,7 +81,7 @@ def docfile_suites(
 	yield docfile_suite(file_candidates(folder, '', ext), optionflags)
 
 
-### tests
+### Tests
 
 def DOCTEST_GLOBALS():
     """See: http://bugs.python.org/issue5021"""
@@ -114,21 +114,24 @@ def unittest_suite(mod):
 ### Utility
 
 def file_candidates(base, prefix, match_ext):
+    """Produce a sequence of paths in base where the relative name
+    starts with prefix."""
     return (
 	p for (p, n) in candidates(base, match_ext)
 	if n.startswith(prefix)
     )
 
 def module_candidates(base, prefix, match_ext):
+    """Produce sequence of module names in the prefix namespace
+    located in the folder base."""
     for (filename, name) in candidates(base, match_ext):
-	if name == '__init__':
-	    yield prefix
-	elif name.endswith('__init__'):
+	if name.endswith('__init__'):
 	    name = name[:-9]
-	if name.startswith(prefix):
-	    yield '.'.join((prefix, name.replace('/', '.'))).strip('.')
+	yield '.'.join((prefix, name.replace('/', '.'))).strip('.')
 
 def candidates(base, match_ext):
+    """Produce sequence of (path, relative_name) items by scanning the
+    subtree of base for files with a match_ext extension."""
     chop = len(base) + 1
     for (dirpath, dirnames, filenames) in os.walk(base):
 	for filename in filenames:
@@ -136,6 +139,7 @@ def candidates(base, match_ext):
 	    (name, ext) = path.splitext(qualified)
 	    if ext in match_ext:
 		relative = name[chop:]
+		## ignore dotfiles
 		if not relative.startswith('.'):
 		    yield (qualified, relative)
 
@@ -143,19 +147,9 @@ def module(name):
     """Return the module associated with name, importing it if
     necessary.  Assume absolute imports."""
     if inspect.ismodule(name):
-	mod = name
-    elif name in sys.modules:
-	mod = sys.modules[name]
-    elif '.' in name:
-	(package, module) = name.rsplit('.', 1)
-	mod = getattr(
-	    __import__(package, fromlist=[module], level=0),
-	    module
-	)
+	return name
     else:
-	mod = __import__(name)
-
-    return mod
+	return import_module(name)
 
 def top_level_dirname(mod):
     """Return the directory of the absolute top-level package of mod.
