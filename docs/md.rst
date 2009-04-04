@@ -5,5 +5,6 @@
 .. toctree::
    :maxdepth: 2
 
-   md.stm
    md.fluid
+   md.stm
+   md.test

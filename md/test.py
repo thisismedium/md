@@ -33,7 +33,7 @@ def pkg_suite(
     result = unittest.TestSuite()
 
     mod = module(name)
-    result.addTests(module_suites(mod, unitext, docext, optionflags))
+    result.addTests(module_suites(mod, unitext, optionflags))
     result.addTests(
 	docfile_suites(mod, docprefix, docfolders, docext, optionflags)
     )
@@ -49,15 +49,12 @@ def have_tests(suites):
     return (s for s in suites if s and s._tests)
 
 @suites
-def module_suites(
-    mod, unitext=UNITTEST_EXT, docext=DOCTEST_EXT,
-    optionflags=DOCTEST_OPTIONS
-):
+def module_suites(mod, ext=UNITTEST_EXT, optionflags=DOCTEST_OPTIONS):
     mod = module(mod)
     if is_package(mod):
 	base = path.dirname(mod.__file__)
 	prefix = mod.__name__
-	for mod in module_candidates(base, prefix, unitext):
+	for mod in module_candidates(base, prefix, ext):
 	    yield doctest_suite(mod, optionflags)
 	    yield unittest_suite(mod)
     else:

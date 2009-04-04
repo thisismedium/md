@@ -8,4 +8,5 @@ The :mod:`md` package is a collection of utilities for Python.
    :maxdepth: 2
 
    md
+   scripts
    examples
