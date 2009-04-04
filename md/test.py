@@ -92,7 +92,7 @@ def doctest_suite(mod, optionflags=DOCTEST_OPTIONS):
 	return doctest.DocTestSuite(
 	    module(mod),
 	    optionflags=optionflags,
-	    globs=DOCTEST_GLOBALS()
+	    extraglobs=DOCTEST_GLOBALS()
 	)
     except ValueError:
 	## DocTestSuite raises a value error if it doesn't find
