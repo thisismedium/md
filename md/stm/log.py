@@ -10,6 +10,7 @@ class entry(namedtuple('entry', 'cursor state')):
 
 class log(Log):
     __slots__ = ('entries',)
+
     DataType = dict
 
     def __init__(self, seq=()):
@@ -17,19 +18,19 @@ class log(Log):
 	self.update(seq)
 
     def __contains__(self, cursor):
-	return id(cursor) in self.entries
+	return cursor.__id__ in self.entries
 
     def __iter__(self):
 	return self.entries.itervalues()
 
     def __delitem__(self, cursor):
-	del self.entries[id(cursor)]
+	del self.entries[cursor.__id__]
 
     def __getitem__(self, cursor):
-	return self.entries[id(cursor)].state
+	return self.entries[cursor.__id__].state
 
     def __setitem__(self, cursor, state):
-	self.entries[id(cursor)] = entry(cursor, state)
+	self.entries[cursor.__id__] = entry(cursor, state)
 
     def get(self, cursor, default=None):
 	try:
@@ -58,12 +59,15 @@ class log(Log):
 	for (cursor, state) in seq:
 	    self[cursor] = state
 
+    def clear(self):
+	self.entries.clear()
+
 class weakentry(ref):
     __slots__ = ('id', 'state')
 
     def __new__(cls, cursor, state, callback):
 	self = ref.__new__(cls, cursor, callback)
-	self.id = id(cursor)
+	self.id = cursor.__id__
 	self.state = state
 	return self
 
@@ -83,7 +87,7 @@ class weaklog(log):
 
     def __contains__(self, cursor):
 	try:
-	    return self.entries[id(cursor)]() is not None
+	    return self.entries[cursor.__id__]() is not None
 	except KeyError:
 	    return False
 
@@ -94,12 +98,12 @@ class weaklog(log):
 		yield (cursor, entry.state)
 
     def __getitem__(self, cursor):
-	entry = self.entries[id(cursor)]
+	entry = self.entries[cursor.__id__]
 	if entry() is not None:
 	    return entry.state
 	else:
 	    raise KeyError, cursor
 
     def __setitem__(self, cursor, state):
-	self.entries[id(cursor)] = weakentry(cursor, state, self._remove)
+	self.entries[cursor.__id__] = weakentry(cursor, state, self._remove)
 

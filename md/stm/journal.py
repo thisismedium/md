@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 import copy, threading
 from collections import namedtuple
-from .interfaces import Cursor, Journal, Memory, Change
+from .interfaces import Cursor, Journal, Memory, Change, CannotCommit
 from .log import log, weaklog
 
 __all__ = (
@@ -14,13 +14,14 @@ class change(namedtuple('changes', 'cursor orig state'), Change):
     pass
 
 class memory(Memory):
+    LogType = weaklog
 
     def __init__(self, name='*memory*', check_read=True, check_write=True):
 	self.name = name
-	self.mem = weaklog()
 	self.write_lock = threading.RLock()
 	self.check_read = check_read
 	self.check_write = check_write
+	self.mem = self.LogType()
 
     def __repr__(self):
 	return '<%s %s>' % (type(self).__name__, str(self))
@@ -37,7 +38,7 @@ class memory(Memory):
     def commit_changes(self, read, changed):
 	with self.write_lock:
 	    self.verify_read(read)
-	    self.mem.update(self.verify_write(changed))
+	    self.write_changes(self.verify_write(changed))
 
     def verify_read(self, read):
 	if self.check_read:
@@ -49,15 +50,18 @@ class memory(Memory):
 	else:
 	    return unverified_write(changed)
 
-class journal(Journal):
+    def write_changes(self, changed):
+	self.mem.update(changed)
 
+class journal(Journal):
+    LogType = log
     source = None
 
     def __init__(self, name, source):
 	self.source = source
-	self.read_log = log()
-	self.commit_log = log()
-	self.write_log = log()
+	self.read_log = self.LogType()
+	self.commit_log = self.LogType()
+	self.write_log = self.LogType()
 
     def __repr__(self):
 	return '<%s %s>' % (type(self).__name__, str(self))

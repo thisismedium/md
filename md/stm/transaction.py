@@ -6,8 +6,10 @@ from .interfaces import *
 from .journal import *
 
 __all__ = (
-    'initialize', 'allocate', 'readable', 'writable', 'delete',
-    'transaction', 'save', 'rollback', 'commit', 'abort', 'saved', 'unsaved',
+    'initialize', 'uninitialize',
+    'allocate', 'readable', 'writable', 'delete',
+    'transaction', 'transactionally', 'save', 'rollback', 'commit', 'abort',
+    'saved', 'unsaved'
 )
 
 def initialize(mem=None):
@@ -16,6 +18,13 @@ def initialize(mem=None):
 	CURRENT_JOURNAL.value = mem or memory()
     else:
 	raise RuntimeError('STM already initialized', journal)
+
+def uninitialize():
+    journal = CURRENT_JOURNAL.value
+    if journal is not None:
+	if journal.source is not None:
+	    raise RuntimeError('Cannot uninitialize a transaction', journal)
+	CURRENT_JOURNAL.value = None
 
 
 ### Transasctional Data Type Operations
@@ -36,7 +45,7 @@ def delete(cursor):
 ### Transactions
 
 @contextmanager
-def transaction(name='*nested*', autocommit=True, autosave=False):
+def transaction(name='*nested*', autocommit=True, autosave=True):
     try:
 	with CURRENT_JOURNAL.let(journal(name, current_journal())):
 	    yield
@@ -44,6 +53,19 @@ def transaction(name='*nested*', autocommit=True, autosave=False):
 	    if autocommit: commit()
     except Abort:
 	pass
+
+def transactionally(proc, *args, **kwargs):
+    limit = kwargs.pop('__attempts__', 3)
+    autocommit = kwargs.pop('autocommit', True)
+    autosave= kwargs.pop('autosave', True)
+
+    for attempt in xrange(limit):
+	try:
+	    with transaction(autocommit=autocommit, autosave=autosave):
+		return proc(*args, **kwargs)
+	except CannotCommit as exc:
+	    pass
+    raise exc
 
 def save(what=None):
     change_state(save_state, current_journal(), what or unsaved())
@@ -74,4 +96,10 @@ CURRENT_JOURNAL = fluid.cell(None, type=fluid.private)
 @fluid.accessor(None)
 def current_journal():
     return CURRENT_JOURNAL.value
+
+def current_memory():
+    journal = current_journal()
+    while journal.source:
+	journal = journal.source
+    return journal
 

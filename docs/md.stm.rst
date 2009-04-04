@@ -16,6 +16,11 @@ instance state.
 
    >>> from md.stm import *
 
+.. doctest::
+   :hide:
+
+   >>> uninitialize()
+
 Memory
 ------
 
@@ -84,8 +89,7 @@ Default :class:`Cursor` Implementation
 
    A simple :class:`Cursor` implementation is provided by :mod:`stm`.
    It defines :meth:`__new__`, :meth:`__getattr__`,
-   :meth:`__setattr__`, :meth:`__delattr__`, :meth:`__getitem__`,
-   :meth:`__setitem__`, and :meth:`__delitem__`.  Simply inherit from
+   :meth:`__setattr__`, and :meth:`__delattr__`.  Simply inherit from
    :class:`cursor` instead of :class:`object`.
 
    >>> class cell(cursor):
@@ -106,6 +110,15 @@ Default :class:`Cursor` Implementation
    ...
    ...     def __repr__(self):
    ...         return '<sequence %r>' % readable(self)
+   ...
+   ...     def __getitem__(self, key):
+   ...         return readable(self)[key]
+   ...
+   ...     def __setitem__(self, key, value):
+   ...         writable(self)[key] = value
+   ...
+   ...     def __delitem__(self, key):
+   ...         del writable(self)[key]
    ...
    ...     def extend(self, seq):
    ...         writable(self).extend(seq)
@@ -150,9 +163,9 @@ and each method uses a transactional operator.
    ...    def __delitem__(self, key):
    ...        del writable(self)[key]
 
-   >>> with transaction():
+   >>> with transaction(autosave=False):
    ...     t1 = save(tmap(a=1, b=2))
-   ...     with transaction(autosave=True):
+   ...     with transaction():
    ...         t1.update(a=20, c=3)
    ...         print rollback(t1), '(rollback)'
    ...         t1['d'] = 4
@@ -164,7 +177,7 @@ and each method uses a transactional operator.
 Transactions
 ------------
 
-.. function:: transaction([name], autocommit=True, autosave=False)
+.. function:: transaction([name], autocommit=True, autosave=True)
 
    A transaction provides a context for transactional memory
    operations.  Saving changed data writes the changes to a
@@ -173,23 +186,36 @@ Transactions
    transaction operates against the transactional memory store.
    Transactions may be nested.
 
+.. function:: transactionally(proc, *args, **kwargs)
+
+   This is a basic optimistic concurrency operator.  It attempts to
+   run ``proc(*args, **kwargs)`` inside a transaction several times
+   before giving up.  See :doc:`examples/stm` for examples.  The
+   :func:`transactionally` operator accepts three optional keyword
+   arguments and returns the result of calling :obj:`proc`.
+
+   :param __attempts__: The number of attempts to make (default: ``3``)
+   :param autosave: Passed to :func:`transaction` (default: ``True``)
+   :param autocommit: Passed to :func:`transaction` (default: ``True``)
+
 .. function:: save([what]) -> what
 
-   Transactions auto-commit by default.  Use :func:`save` to add
-   changes that will be committed.  Unsaved changes "vanish" when the
-   transaction is completed.  Without any arguments, all
-   :func:`unsaved` changes are saved.  Otherwise, ``what`` may be a
-   cursor or sequence of cursors.
+   Transactions auto-commit and auto-save by default.  Use
+   :func:`save` to add changes that will be committed with auto-save
+   is disabled..  Unsaved changes are discarded when the transaction
+   is completed.  Without any arguments, all :func:`unsaved` changes
+   are saved.  Otherwise, ``what`` may be a cursor or sequence of
+   cursors.
 
    .. doctest::
 
-      >>> with transaction():
+      >>> with transaction(autosave=False):
       ...     s1 = save(sequence([1, 2, 3]))
       ...     c1 = save(cell(s1))
       >>> c1.value
       <sequence [1, 2, 3]>
 
-      >>> with transaction():
+      >>> with transaction(autosave=False):
       ...     c1.value[1] = 20
       >>> c1.value
       <sequence [1, 2, 3]>
@@ -199,26 +225,26 @@ Transactions
 
    .. doctest::
 
-      >>> with transaction():
+      >>> with transaction(autosave=False):
       ...     c1.value[1] = 20
       ...     save(c1.value)
       <sequence [1, 20, 3]>
       >>> c1.value
       <sequence [1, 20, 3]>
 
-      >>> with transaction(autocommit=False):
+      >>> with transaction(autocommit=False, autosave=False):
       ...     c1.value[2] = 30
       ...     save(c1)
       <cell <sequence [1, 20, 30]>>
       >>> c1
       <cell <sequence [1, 20, 3]>>
 
-   The ``autosave`` argument is convenient for "always commit
-   everything" transactions.
+   Leaving the ``autosave`` argument set to ``True`` is convenient for
+   "always commit everything" transactions.
 
    .. doctest::
 
-      >>> with transaction(autosave=True):
+      >>> with transaction():
       ...     c2 = cell(sequence(['a', 'b', 'c']))
       >>> c2.value
       <sequence ['a', 'b', 'c']>
@@ -230,16 +256,16 @@ Transactions
 
    .. doctest::
 
-      >>> with transaction():
+      >>> with transaction(autosave=False):
       ...     c2.value[0] = 'A'
-      ...     with transaction():
+      ...     with transaction(autosave=False):
       ...         print c2.value, '(nested)'
       ...         c2.value[0] = 'Z'
       ...     print c2.value, '(after nested; no save)'
       ...     print rollback(c2.value), '(rollback)'
       ...     c2.value[0] = 'Z'
       ...     print save(c2.value), '(saved)'
-      ...     with transaction():
+      ...     with transaction(autosave=False):
       ...         print c2.value, '(nested2)'
       ...         c2.value[1] = 'Y'
       ...         print save(c2.value), '(nested2 save)'
@@ -264,9 +290,9 @@ Transactions
 
    .. doctest::
 
-      >>> with transaction(autosave=True):
+      >>> with transaction():
       ...    c3 = cell('apple')
-      ...    with transaction(autosave=True):
+      ...    with transaction():
       ...        c3.value = 'banana'
       ...        abort()
 
@@ -285,7 +311,7 @@ Transactions
 
    .. doctest::
 
-      >>> with transaction():
+      >>> with transaction(autosave=False):
       ...     c1.value[0] = 10
       ...     c2.value[1] = 'B'
       ...     print list(saved()), list(unsaved())
@@ -300,25 +326,25 @@ Transactions
 Persistence
 -----------
 
-Pickling is supported by the default :class:`cursor` through
-:mod:`copy_reg`.  A :class:`cursor` does not have a built-in
-persistent identity; dumping and loading a cursor produces a copy.
-Subclasses of :class:`cursor` may override :meth:`__getstate__` to
-specialize the state that is reduced; by default ``readable(self)`` is
-returned.  Pickling a :class:`cursor` in the middle of a transaction
-could lead to unexpected results if the cursor is unsaved or the
-transaction is uncommitted.
+A :class:`cursor` does not have a built-in persistent identity;
+dumping and loading a cursor produces a copy.  Subclasses of
+:class:`cursor` may override :meth:`__getstate__` to specialize the
+state that is reduced; by default ``readable(self)`` is returned.
+Pickling a :class:`cursor` in the middle of a transaction could lead
+to unexpected results if the cursor is unsaved or the transaction is
+uncommitted.
 
->>> from cPickle import dumps, loads
+.. doctest::
 
->>> with transaction(autosave=True):
-...     o1 = cursor(); o2 = cursor()
-...     o1.foo = o2
-...     o2.bar = 1
+   >>> from cPickle import dumps, loads
 
->>> o3 = loads(dumps(o1, -1))
->>> o3 is not o1; o3.foo is not o2; o3.foo.bar
-True
-True
-1
+   >>> with transaction():
+   ...     o1 = cursor(); o2 = cursor()
+   ...     o1.foo = o2
+   ...     o2.bar = 1
 
+   >>> o3 = loads(dumps(o1, -1))
+   >>> o3 is not o1; o3.foo is not o2; o3.foo.bar
+   True
+   True
+   1

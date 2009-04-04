@@ -15,10 +15,10 @@ use-cases for fluid bindings.  This example implements context
 managers similar to ``with-input-from-file`` / ``with-output-to-file``
 (defined in R5RS_) and ``with-input-from-string`` /
 ``with-output-to-string`` (defined in `Gambit-C`_).  These allow
-methods using "generic" :func:`read` and :func:`display` operations to
-have their input and output redirected by the caller.  If
-:obj:`__future__.print_function` is being used, a better
-implementation would be to override it instead of defining a
+methods using the dynamically parameterized :func:`read` and
+:func:`display` operations to have their input and output redirected
+by the caller.  If :obj:`__future__.print_function` is being used, a
+better implementation would be to override it instead of defining a
 :func:`display` function.
 
 .. _R5RS: http://www.schemers.org/Documents/Standards/R5RS/
@@ -28,8 +28,6 @@ implementation would be to override it instead of defining a
 
    >>> import os, time, threading
    >>> from docs.examples.fluidprint import *
-
-   >>>
 
    >>> def hello():
    ...     display("Hello, world!")

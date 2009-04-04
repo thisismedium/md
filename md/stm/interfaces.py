@@ -17,6 +17,11 @@ class Cursor(object):
     def __deepcopy__(self, memo):
 	return self
 
+    def __repr__(self):
+	return '<%s %s>' % (type(self).__name__, self.__id__)
+
+    __id__ = property(id)
+
 class Journal(object):
     __metaclass__ = ABCMeta
     __slots__ = ()
@@ -132,3 +137,7 @@ class Log(Iterable, Container):
     @abstractmethod
     def pop(self, cursor, *default):
 	"""Remove cursor and return its state."""
+
+    @abstractmethod
+    def clear(self):
+	"""Clear all state information."""
