@@ -12,7 +12,7 @@ setup(
     keywords = 'utilities transaction transactions fluid dynamic',
 
     packages = list(find_packages(exclude=('tests', 'docs', 'docs.*'))),
-    requires = 'importlib',
+    install_requires = 'importlib',
     scripts = ['bin/pytest'],
     test_suite = 'tests.all',
 
