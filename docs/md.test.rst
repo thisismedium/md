@@ -61,7 +61,7 @@ Example
 -------
 
 The :mod:`md` module uses these suite constructors to make a "test
-all" suite for ``setup.py``.  Here is the contents of
+all" suite for ``setup.py``.  Here are the contents of
 ``tests/__init__.py`` in the source distribution:
 
 .. literalinclude:: ../tests/__init__.py
