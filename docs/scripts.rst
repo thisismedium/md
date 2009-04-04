@@ -9,7 +9,7 @@ These scripts are included with the :mod:`md` module.
 
 usage: pytest [options] module ...
 
-This script runs tests found :func:`test.pkg_suites` for the given
+This script runs tests found by :func:`test.pkg_suites` for the given
 modules.  This makes running tests for any package or module very
 easy.  Run ``pytest --help`` to see the options.  For example:
 
