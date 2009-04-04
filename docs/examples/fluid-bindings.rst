@@ -68,6 +68,26 @@ And the implementation:
 
 .. literalinclude:: fluidprint.py
 
+Django Request Middleware
+-------------------------
+
+Django views are called with the current request as their first
+parameter.  Sometimes it's inconvenient to pass this around to every
+place in your code that needs it.  Sometimes it's even impossible
+because you're writing a signal handler or hook for some third-party
+django plugin that hasn't anticipated your need to have access to the
+current request.
+
+Using a fluid cell to track the current request is a simple task using
+this example middleware:
+
+.. literalinclude:: request_middleware.py
+
+Here is an example site (run it using ``django-admin.py
+runserver --settings='docs.examples.django_request'``):
+
+.. literalinclude:: django_request.py
+
 Transactions
 ------------
 
