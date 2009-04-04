@@ -1,6 +1,6 @@
 from __future__ import absolute_import
+import re, unittest, doctest, sys, inspect, os, glob, functools
 from importlib import import_module
-import unittest, doctest, sys, inspect, os, glob, functools
 from os import path
 
 __all__ = ('pkg_suite', 'pkg_suites', 'module_suites', 'docfile_suites')
@@ -139,8 +139,7 @@ def candidates(base, match_ext):
 	    (name, ext) = path.splitext(qualified)
 	    if ext in match_ext:
 		relative = name[chop:]
-		## ignore dotfiles
-		if not relative.startswith('.'):
+		if not is_dotfile(relative):
 		    yield (qualified, relative)
 
 def module(name):
@@ -168,3 +167,7 @@ def find_test_folders(base, folders):
 	dirname = path.realpath(path.join(base, folder))
 	if path.exists(dirname):
 	    yield dirname
+
+DOTFILE = re.compile(r'(?:^\.)|(?:/\.)')
+def is_dotfile(path):
+    return bool(DOTFILE.search(path))
