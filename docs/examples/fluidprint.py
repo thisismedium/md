@@ -8,14 +8,17 @@ __all__ = (
     'output_to_file', 'input_from_file'
 )
 
-CURRENT_OUTPUT_PORT = fluid.cell(sys.stdout, type=fluid.copied)
-CURRENT_INPUT_PORT = fluid.cell(sys.stdin, type=fluid.copied)
+## Default to None.  This let's the cells play more nicely with code
+## that changes sys.stdout/sys.stderr directly (like doctest).
+## Binding directly to sys.stdout / sys.stderr is more ideal.
+CURRENT_OUTPUT_PORT = fluid.cell(None, type=fluid.copied)
+CURRENT_INPUT_PORT = fluid.cell(None, type=fluid.copied)
 
 def current_output_port():
-    return CURRENT_OUTPUT_PORT.value
+    return CURRENT_OUTPUT_PORT.value or sys.stdout
 
 def current_input_port():
-    return CURRENT_INPUT_PORT.value
+    return CURRENT_INPUT_PORT.value or sys.stdin
 
 def display(*args, **kwargs):
     kwargs.setdefault('file', current_output_port())
