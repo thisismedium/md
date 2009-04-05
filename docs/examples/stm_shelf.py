@@ -1,11 +1,14 @@
 from __future__ import absolute_import
-import os, shelve, uuid, weakref
+import os, shelve, uuid, weakref, copy
 from collections import Iterator
 from md import stm
 from md.stm.transaction import current_memory
-from md.stm.journal import alloc
+from md.stm.journal import alloc, copy_state
 
-__all__ = ('pid', 'pcursor', 'fetch', 'shelf', 'current_memory')
+__all__ = (
+    'pid', 'pcursor', 'pdict', 'plist', 'pset',
+    'fetch', 'shelf', 'current_memory'
+)
 
 
 ### Persistent Cursor
@@ -13,21 +16,43 @@ __all__ = ('pid', 'pcursor', 'fetch', 'shelf', 'current_memory')
 def pid(cursor):
     return cursor.__pid__
 
-class pcursor(stm.cursor):
-    __slots__ = ('__pid__', )
+class PCursor(object):
+    __slots__ = ()
 
     def __new__(cls, *args, **kwargs):
-	cursor = object.__new__(cls)
-	id = kwargs.get('__id__') or uuid.uuid4().hex
-	return stm.allocate(set_pid(cursor, id), cls.StateType())
+	return allocated(cls, cls.StateType(), kwargs.get('__id__'))
+
+    def __copy__(self):
+	return allocated(type(self), copy_state(readable(self)))
 
     def __reduce__(self):
 	return (delayed, (type(self), pid(self)))
 
     __id__ = property(pid)
 
-def set_pid(cursor, id):
-    object.__setattr__(cursor, '__pid__', id)
+def persist(name, base):
+    """Create a persistent type from any transactional type."""
+
+    def __init__(self, *args, **kwargs):
+	kwargs.pop('__id__', None)
+	base.__init__(self, *args, **kwargs)
+
+    return type(name, (PCursor, base), dict(
+	    __slots__ = ('__pid__', ),
+	    __module__ = __name__,
+	    __init__ = __init__,
+    ))
+
+pcursor = persist('pcursor', stm.cursor)
+pdict = persist('pdict', stm.tdict)
+plist = persist('plist', stm.tlist)
+pset = persist('pset', stm.tset)
+
+def allocated(cls, state, id=None):
+    return stm.allocate(set_pid(object.__new__(cls), id), state)
+
+def set_pid(cursor, id=None):
+    object.__setattr__(cursor, '__pid__', id or uuid.uuid4().hex)
     return cursor
 
 
@@ -81,7 +106,7 @@ class shelf(stm.memory):
 	## Store (cls, state) tuples rather than directly pickling a
 	## cursor.  Pickling it would only make a lazy reference.
 	for (cursor, state) in changed:
-	    if isinstance(cursor, pcursor):
+	    if isinstance(cursor, PCursor):
 		self.store[verify_pid(self, cursor)] = (type(cursor), state)
 	self.store.sync()
 

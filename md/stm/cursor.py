@@ -1,7 +1,9 @@
 from __future__ import absolute_import
+import copy
 from collections import MutableSequence, MutableSet, MutableMapping
 from .interfaces import Cursor
 from .transaction import allocate, readable, writable
+from .journal import copy_state
 
 __all__ = ('cursor', 'tdict', 'tlist', 'tset')
 
@@ -14,6 +16,18 @@ class cursor(Cursor):
 
     def __new__(cls, *args, **kwargs):
 	return allocated(cls, cls.StateType())
+
+    def __reduce__(self):
+	return (allocated, (type(self), self.__getstate__()))
+
+    def __getstate__(self):
+	return readable(self)
+
+    def __sizeof__(self):
+	return object.__sizeof__(self) + readable(self).__sizeof__()
+
+    def __copy__(self):
+	return allocated(type(self), copy_state(readable(self)))
 
     def __getattr__(self, key):
 	try:
@@ -32,15 +46,6 @@ class cursor(Cursor):
 	    del writable(self)[key]
 	except KeyError:
 	    raise AttributeError, key
-
-    def __reduce__(self):
-	return (allocated, (type(self), self.__getstate__()))
-
-    def __getstate__(self):
-	return readable(self)
-
-    def __sizeof__(self):
-	return object.__sizeof__(self) + readable(self).__sizeof__()
 
 
 ### Pickling
@@ -175,15 +180,13 @@ class tlist(_collection, MutableSequence):
 
 class tdict(_collection, MutableMapping):
 
-    ## Almost exactly the implementation of UserDict
-
     def __init__(self, dict=None, **kwargs):
 	if dict is not None:
 	    self.update(dict)
 	if kwargs:
 	    self.update(kwargs)
 
-    def __getitem__(self):
+    def __getitem__(self, key):
 	data = readable(self)
 	if key in data:
 	    return data[key]
@@ -198,8 +201,7 @@ class tdict(_collection, MutableMapping):
 	return writable(self).clear()
 
     def copy(self):
-	import copy
-	return allocate(copy.copy(self), copy.copy(readable(self)))
+	return copy.copy(self)
 
     @classmethod
     def fromkeys(cls, iterable, value=None):
@@ -307,8 +309,7 @@ class tset(_collection, MutableSet):
 	return writable(self).clear()
 
     def copy(self):
-	import copy
-	return allocate(copy.copy(self), copy.copy(readable(self)))
+	return copy.copy(self)
 
     def difference(self, *args):
 	return readable(self).difference(*args)

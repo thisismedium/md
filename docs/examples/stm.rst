@@ -68,12 +68,13 @@ re-run.  The second time, it succeeds and aquires the values ``3`` and
    worker2 (1, 2)
    worker1 (3, 4)
 
-Cursor From Scratch
--------------------
+Custom Cursor
+-------------
 
-This example defines a transactional :class:`MutableMapping`
-implementation called :class:`tdict`.  It does not inherit from any
-predefined :class:`Cursor` implementations.
+Extending :class:`stm.cursor` is easiest, but it is possible to make
+an independent :class:`stm.Cursor` type from scratch.  This example
+defines a transactional :class:`MutableMapping` implementation called
+:class:`tmap`.
 
 .. doctest::
 
@@ -160,38 +161,52 @@ persistent id associated with a cursor.
 
    >>> with transaction():
    ...     foo = pcursor(__id__='foo')
-   ...     foo.a = pcursor(); foo.a.value = 'A'
+   ...     foo.a = pdict(value='A')
    >>> pid(foo)
    'foo'
 
    >>> del foo; collect()
-   >>> foo = fetch('foo'); foo.a.value
-   'A'
+   >>> foo = fetch('foo'); foo.a
+   {'value': 'A'}
 
 Unsaved or uncommitted changes are not written to the backing store.
 
 .. doctest::
 
    >>> with transaction(autosave=False):
-   ...     foo.a.value = 'changed'
+   ...     foo.a['value'] = 'changed'
 
    >>> del foo; collect()
-   >>> fetch('foo').a.value
-   'A'
+   >>> fetch('foo').a
+   {'value': 'A'}
 
 Normal cursors and persistent cursors can be mixed.  When normal
-cursors are used, they are persisted as "part of" the persistent
-cursor rather than being given a unique persistent identity.
+cursors or plain data are used, they are persisted as "part of" the
+persistent cursor rather than being given a unique persistent
+identity.
 
 .. doctest::
 
    >>> with transaction():
    ...     bar = pcursor(__id__='bar')
-   ...     bar.b = cursor(); bar.b.value = ['B']
+   ...     bar.b = tdict(value=tlist(['B']))
 
    >>> del bar; collect()
-   >>> fetch('bar').b.value
-   ['B']
+   >>> bar = fetch('bar'); bar.b
+   {'value': ['B']}
+
+   >>> with transaction():
+   ...     bar.b['value'].append('B2')
+   >>> bar.b
+   {'value': ['B', 'B2']}
+
+   >>> with transaction():
+   ...     bar.b['value'].append('B3')
+   ...     print rollback(bar.b['value']), '(rolled back)'
+   ...     bar.b['mumble'] = 'quux'
+   ['B', 'B2'] (rolled back)
+   >>> sorted(bar.b.items())
+   [('mumble', 'quux'), ('value', ['B', 'B2'])]
 
 .. doctest::
    :hide:
