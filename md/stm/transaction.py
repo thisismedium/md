@@ -6,7 +6,7 @@ from .interfaces import *
 from .journal import *
 
 __all__ = (
-    'initialize', 'uninitialize',
+    'initialize',
     'allocate', 'readable', 'writable', 'delete',
     'transaction', 'transactionally', 'save', 'rollback', 'commit', 'abort',
     'saved', 'unsaved'
@@ -14,17 +14,9 @@ __all__ = (
 
 def initialize(mem=None):
     journal = CURRENT_JOURNAL.value
-    if journal is None:
-	CURRENT_JOURNAL.value = mem or memory()
-    else:
-	raise RuntimeError('STM already initialized', journal)
-
-def uninitialize():
-    journal = CURRENT_JOURNAL.value
-    if journal is not None:
-	if journal.source is not None:
-	    raise RuntimeError('Cannot uninitialize a transaction', journal)
-	CURRENT_JOURNAL.value = None
+    if journal is not None and not isinstance(journal, Memory):
+	raise RuntimeError('Cannot uninitialize a transaction', journal)
+    CURRENT_JOURNAL.value = mem or memory()
 
 
 ### Transasctional Data Type Operations

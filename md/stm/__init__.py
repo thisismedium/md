@@ -3,3 +3,5 @@ from .transaction import *
 from .interfaces import *
 from .cursor import *
 from .journal import memory
+
+initialize()

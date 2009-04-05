@@ -19,21 +19,18 @@ instance state.
 .. doctest::
    :hide:
 
-   >>> uninitialize()
+   >>> initialize()
 
 Memory
 ------
 
 .. function:: initialize([mem])
 
-   Initialize transactional memory.  This only needs to be done once.
+   Initialize transactional memory; any existing transactional memory
+   is destroyed.  This is done automatically by the :mod:`stm` module.
    With no arguments, the default :class:`memory` implementation is
    used.  To use a custom :class:`Memory`, pass the custom instance as
    the first argument.
-
-   .. doctest::
-
-      >>> initialize()
 
 .. class:: memory([name, check_read=True, check_write=True])
 
@@ -123,56 +120,17 @@ Default :class:`Cursor` Implementation
    ...     def extend(self, seq):
    ...         writable(self).extend(seq)
 
-Example: :class:`tmap`, a custom :class:`Cursor`
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. class:: tdict(dict=None, **kwargs)
 
-This example defines a transactional :class:`MutableMapping`
-implementation called :class:`tmap`.  A dictionary is used for state
-and each method uses a transactional operator.
+   A transactional :class:`dict`.
 
-.. doctest::
+.. class:: tlist(seq=None)
 
-   >>> from collections import MutableMapping
+   A transactional :class:`list`.
 
-   >>> class tmap(Cursor, MutableMapping):
-   ...
-   ...    def __new__(cls, *args, **kwargs):
-   ...        return allocate(object.__new__(cls), {})
-   ...
-   ...    def __init__(self, items=(), **kwargs):
-   ...        self.update(items, **kwargs)
-   ...
-   ...    def __repr__(self):
-   ...        return '<%s %r>' % (type(self).__name__, sorted(self.iteritems()))
-   ...
-   ...    def __iter__(self):
-   ...        return iter(readable(self))
-   ...
-   ...    def __len__(self):
-   ...        return len(readable(self))
-   ...
-   ...    def __contains__(self, key):
-   ...        return key in readable(self)
-   ...
-   ...    def __getitem__(self, key):
-   ...        return readable(self)[key]
-   ...
-   ...    def __setitem__(self, key, value):
-   ...        writable(self)[key] = value
-   ...
-   ...    def __delitem__(self, key):
-   ...        del writable(self)[key]
+.. class:: tset(seq=None)
 
-   >>> with transaction(autosave=False):
-   ...     t1 = save(tmap(a=1, b=2))
-   ...     with transaction():
-   ...         t1.update(a=20, c=3)
-   ...         print rollback(t1), '(rollback)'
-   ...         t1['d'] = 4
-   <tmap [('a', 1), ('b', 2)]> (rollback)
-
-   >>> t1
-   <tmap [('a', 1), ('b', 2), ('d', 4)]>
+   A transactional :class:`set`.
 
 Transactions
 ------------
@@ -201,24 +159,24 @@ Transactions
 .. function:: save([what]) -> what
 
    Transactions auto-commit and auto-save by default.  Use
-   :func:`save` to add changes that will be committed with auto-save
-   is disabled..  Unsaved changes are discarded when the transaction
-   is completed.  Without any arguments, all :func:`unsaved` changes
-   are saved.  Otherwise, ``what`` may be a cursor or sequence of
-   cursors.
+   :func:`save` to add changes that will be committed when auto-save
+   is disabled or before calling a nested transaction.  Unsaved
+   changes are discarded when the transaction is completed.  Without
+   any arguments, all :func:`unsaved` changes are saved.  Otherwise,
+   ``what`` may be a cursor or sequence of cursors.
 
    .. doctest::
 
       >>> with transaction(autosave=False):
-      ...     s1 = save(sequence([1, 2, 3]))
+      ...     s1 = save(tlist([1, 2, 3]))
       ...     c1 = save(cell(s1))
       >>> c1.value
-      <sequence [1, 2, 3]>
+      [1, 2, 3]
 
       >>> with transaction(autosave=False):
       ...     c1.value[1] = 20
       >>> c1.value
-      <sequence [1, 2, 3]>
+      [1, 2, 3]
 
    Save must be called on the cursor that's changed.  Calling save on
    a cursor referring to a changed cursor won't work.
@@ -228,16 +186,16 @@ Transactions
       >>> with transaction(autosave=False):
       ...     c1.value[1] = 20
       ...     save(c1.value)
-      <sequence [1, 20, 3]>
+      [1, 20, 3]
       >>> c1.value
-      <sequence [1, 20, 3]>
+      [1, 20, 3]
 
       >>> with transaction(autocommit=False, autosave=False):
       ...     c1.value[2] = 30
       ...     save(c1)
-      <cell <sequence [1, 20, 30]>>
+      <cell [1, 20, 30]>
       >>> c1
-      <cell <sequence [1, 20, 3]>>
+      <cell [1, 20, 3]>
 
    Leaving the ``autosave`` argument set to ``True`` is convenient for
    "always commit everything" transactions.
@@ -245,14 +203,15 @@ Transactions
    .. doctest::
 
       >>> with transaction():
-      ...     c2 = cell(sequence(['a', 'b', 'c']))
+      ...     c2 = cell(tlist(['a', 'b', 'c']))
       >>> c2.value
-      <sequence ['a', 'b', 'c']>
+      ['a', 'b', 'c']
 
 .. function:: rollback([what]) -> what
 
-   This operator is the opposite of :func:`save`; it reverts a cursor
-   to its last saved state.
+   Revert a cursor to its last saved state (the opposite of
+   :func:`save`).  When called with no arguments, all :func:`unsaved`
+   cursors are reverted.
 
    .. doctest::
 
@@ -270,23 +229,22 @@ Transactions
       ...         c2.value[1] = 'Y'
       ...         print save(c2.value), '(nested2 save)'
       ...     print c2.value, '(after nested2 save)'
-      <sequence ['a', 'b', 'c']> (nested)
-      <sequence ['A', 'b', 'c']> (after nested; no save)
-      <sequence ['a', 'b', 'c']> (rollback)
-      <sequence ['Z', 'b', 'c']> (saved)
-      <sequence ['Z', 'b', 'c']> (nested2)
-      <sequence ['Z', 'Y', 'c']> (nested2 save)
-      <sequence ['Z', 'Y', 'c']> (after nested2 save)
+      ['a', 'b', 'c'] (nested)
+      ['A', 'b', 'c'] (after nested; no save)
+      ['a', 'b', 'c'] (rollback)
+      ['Z', 'b', 'c'] (saved)
+      ['Z', 'b', 'c'] (nested2)
+      ['Z', 'Y', 'c'] (nested2 save)
+      ['Z', 'Y', 'c'] (after nested2 save)
 
 .. function:: commit()
 
-   This operator can be used to manually commit a transaction if
-   ``autocommit`` is ``False``.
+   Manually commit a transaction if ``autocommit`` is ``False``.
 
 .. function:: abort()
 
-   This operator terminates the current transaction.  Any uncommitted
-   changes are discarded.
+   Terminates the current transaction.  Any uncommitted changes are
+   discarded.
 
    .. doctest::
 
@@ -301,13 +259,12 @@ Transactions
 
 .. function:: saved()
 
-   This operator produces an iterator over the items in a
-   transaction's save-log.
+   Produce an iterator over the items in a transaction's save-log.
 
 .. function:: unsaved()
 
-   This operator produces an iterator over the items that need to be
-   added to a transaction's save-log.
+   Produce an iterator over the items that need to be added to a
+   transaction's save-log.
 
    .. doctest::
 
@@ -317,11 +274,11 @@ Transactions
       ...     print list(saved()), list(unsaved())
       ...     save()
       ...     print list(saved()), list(unsaved())
-      [] [<sequence [10, 20, 3]>, <sequence ['Z', 'B', 'c']>]
-      [<sequence [10, 20, 3]>, <sequence ['Z', 'B', 'c']>] []
+      [] [[10, 20, 3], ['Z', 'B', 'c']]
+      [[10, 20, 3], ['Z', 'B', 'c']] []
 
       >>> c2.value
-      <sequence ['Z', 'B', 'c']>
+      ['Z', 'B', 'c']
 
 Persistence
 -----------
@@ -333,6 +290,9 @@ state that is reduced; by default ``readable(self)`` is returned.
 Pickling a :class:`cursor` in the middle of a transaction could lead
 to unexpected results if the cursor is unsaved or the transaction is
 uncommitted.
+
+See the examples in :doc:`examples/stm` for a simple persistent memory
+implementation.
 
 .. doctest::
 

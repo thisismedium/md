@@ -6,16 +6,16 @@
 
    >>> from md.stm import *
 
+.. doctest::
+   :hide:
+
+   >>> initialize()
+
 Optimistic Concurrency
 ----------------------
 
 This is a simple example that uses transactional memory to implement a
 serial datatype.
-
-.. doctest::
-   :hide:
-
-   >>> uninitialize()
 
 .. doctest::
 
@@ -59,8 +59,6 @@ re-run.  The second time, it succeeds and aquires the values ``3`` and
    >>> def worker2():
    ...     show('worker2', transactionally(next2, count))
 
-   >>> initialize()
-
    >>> with transaction():
    ...     count = serial()
 
@@ -70,6 +68,56 @@ re-run.  The second time, it succeeds and aquires the values ``3`` and
    worker2 (1, 2)
    worker1 (3, 4)
 
+Cursor From Scratch
+-------------------
+
+This example defines a transactional :class:`MutableMapping`
+implementation called :class:`tdict`.  It does not inherit from any
+predefined :class:`Cursor` implementations.
+
+.. doctest::
+
+   >>> from collections import MutableMapping
+
+   >>> class tmap(Cursor, MutableMapping):
+   ...
+   ...    def __new__(cls, *args, **kwargs):
+   ...        return allocate(object.__new__(cls), {})
+   ...
+   ...    def __init__(self, items=(), **kwargs):
+   ...        self.update(items, **kwargs)
+   ...
+   ...    def __repr__(self):
+   ...        return '<%s %r>' % (type(self).__name__, sorted(self.iteritems()))
+   ...
+   ...    def __iter__(self):
+   ...        return iter(readable(self))
+   ...
+   ...    def __len__(self):
+   ...        return len(readable(self))
+   ...
+   ...    def __contains__(self, key):
+   ...        return key in readable(self)
+   ...
+   ...    def __getitem__(self, key):
+   ...        return readable(self)[key]
+   ...
+   ...    def __setitem__(self, key, value):
+   ...        writable(self)[key] = value
+   ...
+   ...    def __delitem__(self, key):
+   ...        del writable(self)[key]
+
+   >>> with transaction():
+   ...     t1 = save(tmap(a=1, b=2))
+   ...     with transaction():
+   ...         t1.update(a=20, c=3)
+   ...         print rollback(t1), '(rollback)'
+   ...         t1['d'] = 4
+   <tmap [('a', 1), ('b', 2)]> (rollback)
+
+   >>> t1
+   <tmap [('a', 1), ('b', 2), ('d', 4)]>
 
 :class:`shelf` -- Persistent Transactional Memory
 -------------------------------------------------
@@ -77,11 +125,6 @@ re-run.  The second time, it succeeds and aquires the values ``3`` and
 This is a more advanced example.  :class:`cursor` is extended to have
 a persistent identity and :class:`memory` is extended to fetch and
 store persistent cursors from a shelf.
-
-.. doctest::
-   :hide:
-
-   >>> uninitialize()
 
 Basic Use
 ~~~~~~~~~
@@ -102,7 +145,7 @@ Here is a basic example.  Transactional memory is initialized with a
 .. doctest::
    :hide:
 
-   >>> current_memory().clear() # for the doctest
+   >>> current_memory().clear()
 
 A :class:`pcursor` works like a cursor and optionally takes a keyword
 argument, :obj:`__id__`, that will become the new cursor's persistent
@@ -154,7 +197,6 @@ cursor rather than being given a unique persistent identity.
    :hide:
 
    >>> current_memory().destroy()
-   >>> uninitialize()
 
 Implementation
 ~~~~~~~~~~~~~~
