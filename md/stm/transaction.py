@@ -83,11 +83,11 @@ def unsaved():
 ### Journal
 
 class aquire_memory(fluid.aquired):
-    def __localize__(self, loc):
+    def localize(self, loc):
 	if isinstance(loc.value, Journal):
 	    return self.make_location(find_memory(loc.value))
 	else:
-	    return super(aquire_memory, self).__localize__(loc)
+	    return super(aquire_memory, self).localize(loc)
 
 def find_memory(journal):
     while journal.source:

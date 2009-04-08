@@ -89,7 +89,7 @@ class env(threading.local):
 def localize(frames):
     return (
 	(c, loc) for (c, loc) in
-	((c, c.__localize__(loc)) for f in frames for (c, loc) in f)
+	((c, c.localize(loc)) for f in frames for (c, loc) in f)
 	if loc is not NotImplemented
     )
 
@@ -155,11 +155,11 @@ class Cell(object):
 	    value = value
 	self.default = location(value)
 
-    @abstractmethod
-    def __localize__(self):
-	"""Localize the cell for a new thread."""
-
     value = property(lambda s: s.get(), lambda s, v: s.set(v))
+
+    @abstractmethod
+    def localize(self):
+	"""Localize the cell for a new thread."""
 
     def bind(self, value):
 	return self.make_location(self.validate(value))
@@ -177,21 +177,21 @@ class Cell(object):
 	return self.ENV.bind((self, value))
 
 class private(Cell):
-    def __localize__(self, loc):
+    def localize(self, loc):
 	return location(self.default.value)
 
 class shared(Cell):
-    def __localize__(self, loc):
+    def localize(self, loc):
 	return loc
 
 class aquired(Cell):
-    def __localize__(self, loc):
+    def localize(self, loc):
 	return self.make_location(loc.value)
 
 class copied(Cell):
-    def __localize__(self, loc):
+    def localize(self, loc):
 	return self.make_location(copy.copy(loc.value))
 
 class deepcopied(Cell):
-    def __localize__(self, loc):
+    def localize(self, loc):
 	return self.make_location(copy.deepcopy(loc.value))
