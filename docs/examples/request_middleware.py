@@ -1,10 +1,7 @@
 from md import fluid
 
 CURRENT_REQUEST = fluid.cell(None, type=fluid.private)
-
-@fluid.accessor(CURRENT_REQUEST.value)
-def current_request():
-    return CURRENT_REQUEST.value
+current_request = fluid.accessor(CURRENT_REQUEST, 'request')
 
 class RequestMiddleware(object):
     def process_request(self, request):
