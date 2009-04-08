@@ -32,11 +32,15 @@ def pkg_suite(
 ):
     result = unittest.TestSuite()
 
-    mod = module(name)
-    result.addTests(module_suites(mod, unitext, optionflags))
-    result.addTests(
-	docfile_suites(mod, docprefix, docfolders, docext, optionflags)
-    )
+    (_, ext) = path.splitext(name)
+    if ext in docext:
+	result.addTests(docfile_suite([name], optionflags))
+    else:
+	mod = module(name)
+	result.addTests(module_suites(mod, unitext, optionflags))
+	result.addTests(
+	    docfile_suites(mod, docprefix, docfolders, docext, optionflags)
+	)
 
     return result
 

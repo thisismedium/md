@@ -40,18 +40,16 @@ def comma_list(name, options=None):
 	options = (os.environ[name],)
     return options and [o.strip() for o in options.split(',')]
 
-def run_tests(mod_names, verbosity, **kwargs):
-    tests = unittest.TestSuite()
-    for name in mod_names:
-	tests.addTest(test.pkg_suite(name, **kwargs))
+def run_tests(names, verbosity, **kwargs):
+    tests = test.pkg_suites(*names, **kwargs)
     runner = unittest.TextTestRunner(descriptions=1, verbosity=verbosity)
     return runner.run(tests)
 
 def main():
     parser = optparser()
-    opt, mod_names = parser.parse_args()
+    opt, names = parser.parse_args()
 
-    if not mod_names:
+    if not names:
 	parser.print_usage()
 	sys.exit(1)
     else:
@@ -60,7 +58,7 @@ def main():
 	unitext = comma_list('UNITTEST_EXT', opt.unitext)
 
 	result = run_tests(
-	    mod_names, opt.verbosity,
+	    names, opt.verbosity,
 	    docfolders=docfolders, docext=docext, unitext=unitext
 	)
 
