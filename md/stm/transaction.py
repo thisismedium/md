@@ -13,12 +13,6 @@ __all__ = (
     'saved', 'unsaved'
 )
 
-def initialize(mem=None):
-    journal = JOURNAL.value
-    if journal is not None and not isinstance(journal, Memory):
-	raise RuntimeError('Cannot uninitialize a transaction', journal)
-    JOURNAL.value = mem or memory()
-
 
 ### Transasctional Data Type Operations
 
@@ -88,12 +82,27 @@ def unsaved():
 
 ### Journal
 
-JOURNAL = fluid.cell(None, type=fluid.private)
-current_journal = fluid.accessor('fluid', JOURNAL, require=True)
+class aquire_memory(fluid.aquired):
+    def __localize__(self, loc):
+	if isinstance(loc.value, Journal):
+	    return self.make_location(find_memory(loc.value))
+	else:
+	    return super(aquire_memory, self).__localize__(loc)
 
-def current_memory():
-    journal = current_journal()
+def find_memory(journal):
     while journal.source:
 	journal = journal.source
     return journal
 
+JOURNAL = fluid.cell(type=aquire_memory)
+
+current_journal = fluid.accessor(JOURNAL, name='current_journal')
+
+def current_memory():
+    return find_memory(current_journal())
+
+def initialize(mem=None):
+    journal = JOURNAL.value
+    if isinstance(journal, Journal) and not isinstance(journal, Memory):
+	raise RuntimeError('Cannot uninitialize a transaction', journal)
+    JOURNAL.value = mem or memory()

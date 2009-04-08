@@ -1,29 +1,37 @@
 from __future__ import absolute_import
-import threading
+import threading, copy
 from weakref import WeakKeyDictionary
 from contextlib import contextmanager
 from abc import ABCMeta, abstractmethod
 
-__all__ = ('cell', 'let', 'accessor', 'shared', 'copied', 'private')
+__all__ = (
+    'cell', 'let', 'accessor',
+    'shared', 'aquired', 'copied', 'deepcopied', 'private'
+)
 
-def cell(value, validate=None, type=None):
+def UNDEFINED():
+    """A sentinal value representing an undefined parameter."""
+    return UNDEFINED
+
+def cell(value=UNDEFINED, validate=None, type=None):
     return (type or shared)(value, validate=validate)
 
 def let(*bindings):
     return LOCAL_ENV.bind(*bindings)
 
-def accessor(name, cell, require=False):
+def accessor(cell, name=None):
     """Decorate an accessor procedure to raise a ValueError if it
     returns default."""
 
     def access(*value):
 	if value:
 	    return cell.let(*value)
-	elif require and cell.value == cell.original:
-	    raise ValueError('%s: missing value' % name)
-	return cell.get()
+	else:
+	    value = cell.value
+	    if value is UNDEFINED:
+		raise ValueError('%s is undefined' % (name or cell))
+	    return value
 
-    access.__name__ = name
     return access
 
 
@@ -62,7 +70,7 @@ class env(threading.local):
     @contextmanager
     def bind(self, *bindings):
 	"""Dynamically bind bindings in a new context."""
-	frame = self.frame((c, location(c.validate(v))) for (c, v) in bindings)
+	frame = self.frame((c, c.bind(v)) for (c, v) in bindings)
 	self.push(frame)
 	try:
 	    yield
@@ -141,16 +149,23 @@ class Cell(object):
 
     ENV = LOCAL_ENV
 
-    def __init__(self, value, validate=None):
+    def __init__(self, value=UNDEFINED, validate=None):
 	self.validate = validate or identity
-	self.default = location(self.validate(value))
-	self.original = value
+	if value is not UNDEFINED:
+	    value = value
+	self.default = location(value)
 
     @abstractmethod
     def __localize__(self):
 	"""Localize the cell for a new thread."""
 
     value = property(lambda s: s.get(), lambda s, v: s.set(v))
+
+    def bind(self, value):
+	return self.make_location(self.validate(value))
+
+    def make_location(self, value):
+	return location(value)
 
     def get(self):
 	return self.ENV.locate(self, self.default).value
@@ -163,12 +178,20 @@ class Cell(object):
 
 class private(Cell):
     def __localize__(self, loc):
-	return location(self.original)
+	return location(self.default.value)
 
 class shared(Cell):
     def __localize__(self, loc):
 	return loc
 
+class aquired(Cell):
+    def __localize__(self, loc):
+	return self.make_location(loc.value)
+
 class copied(Cell):
     def __localize__(self, loc):
-	return location(loc.value)
+	return self.make_location(copy.copy(loc.value))
+
+class deepcopied(Cell):
+    def __localize__(self, loc):
+	return self.make_location(copy.deepcopy(loc.value))

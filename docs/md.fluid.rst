@@ -28,16 +28,17 @@ described in more detail in `SRFI 39`_.
 Fluid Cells
 -----------
 
-.. function:: cell(value[, validate, type]) -> Cell
+.. function:: cell([value, validate, type]) -> Cell
 
-   Create a new fluid :class:`Cell` with global ``value``.
+   Create a new fluid :class:`Cell` with global ``value``.  If no
+   ``value`` is given, the cell is bound to an undefined value.
 
    If ``validate`` is given, it should be a callable that accepts a
    new value and returns a value (maybe the same value or something
    derived from it) or raises an exception.
 
-   The ``type`` parameter must be one of: :class:`shared`,
-   :class:`copied`, :class:`private`.  The default is :class:`shared`.
+   The ``type`` can be used to specialize the type of cell created.
+   The default is :class:`shared`.
 
    .. doctest::
 
@@ -67,12 +68,12 @@ Fluid Cells
       ...
       AssertionError: base must be betwee 2 and 36
 
-.. class:: Cell(value[, validate])
+.. class:: Cell([value, validate])
 
-   A cell is assigned a default, global value when it is created.  If
-   the optional ``validate`` is given, it should be a procedure that
-   takes a value and returns another value.  This can be used to check
-   or coerce values assigned to the cell.
+   A cell is assigned a (possibly undefined) value when it is created.
+   If the optional ``validate`` is given, it should be a procedure
+   that takes a value and returns another value.  This can be used to
+   check or coerce values assigned to the cell.
 
    .. attribute:: value
 
@@ -101,77 +102,103 @@ Dynamic Environment
 
 The dynamic environment is propagated to threads when they are started
 by snapshotting the environment of the parent thread.  The propagated
-value depends on the type of the :func:`cell`.  There are three types,
-:class:`shared` is the default.
+value depends on the type of the :func:`cell`; :class:`shared` is the
+default.
 
 .. doctest::
 
    >>> import threading, time
 
-   >>> P1 = fluid.cell('apple')
+   >>> def show(name, status, *cells):
+   ...     print name, (' '.join(str(c.value) for c in cells)), '(%s)' % status
 
-   >>> def show(name, status):
-   ...     print name, 'P1:', P1.value, '(%s)' % status
-
-   >>> def worker1():
-   ...     show('worker1', 'wait for change')
+   >>> def worker1(cell):
+   ...     show('worker1', 'wait for change', cell)
    ...     time.sleep(0.01)
-   ...     show('worker1', 'after change')
+   ...     show('worker1', 'after change', cell)
 
-   >>> def worker2():
+   >>> def worker2(cell):
    ...     time.sleep(0)
-   ...     P1.value = 'banana'
-   ...     show('worker2', 'changed')
+   ...     cell.value = 'banana'
+   ...     show('worker2', 'changed', cell)
 
-   >>> def demo():
-   ...     t1 = threading.Thread(target=worker1)
-   ...     t2 = threading.Thread(target=worker2)
-   ...     with P1.let('pineapple'):
+   >>> def demo(cell):
+   ...     t1 = threading.Thread(target=lambda: worker1(cell))
+   ...     t2 = threading.Thread(target=lambda: worker2(cell))
+   ...     with cell.let('pineapple'):
    ...     	t1.start(); t2.start()
    ...     	t1.join()
-   ...          show('parent', 'workers done')
+   ...          show('parent', 'workers done', cell)
 
 .. class:: shared
 
-   When a :func:`cell` is shared, it is bound to the same memory
-   location in both the parent and child threads.
+   The current binding in the dynamic environment is shared with the
+   new environment.  Mutating any cell with this shared binding
+   affects all cells using that binding.  This is most similar to a
+   global variable.
 
    .. doctest::
 
-      >>> demo()
-      worker1 P1: pineapple (wait for change)
-      worker2 P1: banana (changed)
-      worker1 P1: banana (after change)
-      parent P1: banana (workers done)
+      >>> P1 = fluid.cell('apple')
+      >>> demo(P1)
+      worker1 pineapple (wait for change)
+      worker2 banana (changed)
+      worker1 banana (after change)
+      parent banana (workers done)
 
-.. class:: copied
+.. class:: aquired
 
-   In this case, a copy is made of the parent's binding at
-   snapshot-time.  The cell is bound to the copy in the child's
-   dynamic environment.
+   The current value is aquired from the dynamic environment, but the
+   cell is bound to a new location containing the value.  Mutations of
+   the original location will have no effect on the new location.
 
    .. doctest::
 
-      >>> P1 = fluid.cell('apple', type=fluid.copied)
-      >>> demo()
-      worker1 P1: pineapple (wait for change)
-      worker2 P1: banana (changed)
-      worker1 P1: pineapple (after change)
-      parent P1: pineapple (workers done)
+      >>> P2 = fluid.cell('apple', type=fluid.aquired)
+      >>> demo(P2)
+      worker1 pineapple (wait for change)
+      worker2 banana (changed)
+      worker1 pineapple (after change)
+      parent pineapple (workers done)
 
 .. class:: private
 
-   No binding is added to the child's dynamic environment.  The cell
-   is bound to a copy of its global value.
+   No binding is aquired from the dynamic environment.  The cell is
+   bound to a new location containing its global value.
 
    .. doctest::
 
-      >>> P1 = fluid.cell('apple', type=fluid.private)
-      >>> demo()
-      worker1 P1: apple (wait for change)
-      worker2 P1: banana (changed)
-      worker1 P1: apple (after change)
-      parent P1: pineapple (workers done)
+      >>> P3 = fluid.cell('apple', type=fluid.private)
+      >>> demo(P3)
+      worker1 apple (wait for change)
+      worker2 banana (changed)
+      worker1 apple (after change)
+      parent pineapple (workers done)
+
+.. class:: copied
+.. class:: deepcopied
+
+   These types behave like :class:`aquired`, but they also copy (or
+   deepcopy) the *value* of the binding in addition to creating a new
+   location.  This is useful if the value of the cell is mutable and
+   the new environment should aquire a snapshot of the value.
+
+   .. doctest::
+
+      >>> P4 = fluid.cell(type=fluid.aquired)
+      >>> P5 = fluid.cell(type=fluid.copied)
+
+      >>> def worker3(a, b):
+      ...     a.value[0] = 'radish'
+      ...     b.value[0] = 'mango'
+      ...     show('worker3', 'changed', a, b)
+
+      >>> with fluid.let((P4, ['acorn']), (P5, ['grape'])):
+      ...     t3 = threading.Thread(target=lambda: worker3(P4, P5))
+      ...     t3.start(); t3.join()
+      ...     show('parent', 'workers done', P4, P5)
+      worker3 ['radish'] ['mango'] (changed)
+      parent ['radish'] ['grape'] (workers done)
 
 Utilities
 ---------
@@ -196,19 +223,21 @@ Utilities
       ...     multiply("11")
       9
 
-.. function:: accessor(name, cell, require=False) -> access
+.. function:: accessor(cell[, name]) -> access
 
    The two most common actions on a fluid cell are getting its value
    or creating a binding in a new dynamic context.  An accessor closes
    over a cell.  When it is called with no arguments, the value of the
    cell is returned.  When called with one argument (a new value), a
    context manager is returned that binds the cell to the new value.
-   If ``require=True`` and the value of the cell is accessed and it is
-   still the default value, a value error is raised.
+
+   When a cell is accessed and it has never been assigned a value, a
+   :exc:`ValueError` is raised.  The optional ``name`` parameter is
+   used to enhance the :exc:`ValueError`.
 
    .. doctest::
 
-      >>> multiplier = fluid.accessor('multipler', MULTIPLIER)
+      >>> multiplier = fluid.accessor(MULTIPLIER, name='multiplier')
       >>> with multiplier(20):
       ...    multiplier()
       20
@@ -225,8 +254,7 @@ connection is parameterized through the dynamic environment.
       >>> import sqlite3
       >>> from contextlib import contextmanager
 
-      >>> CONNECTION = fluid.cell(None)
-      >>> connection = fluid.accessor('connection', CONNECTION, require=True)
+      >>> connection = fluid.accessor(fluid.cell(), name='CONNECTION')
 
       >>> @contextmanager
       ... def autocommitted():
@@ -261,7 +289,7 @@ connection is parameterized through the dynamic environment.
       >>> create_schema()
       Traceback (most recent call last):
       ...
-      ValueError: missing value for current_connection
+      ValueError: CONNECTION is undefined
 
       >>> import sqlite3
       >>> with connection(sqlite3.connect(':memory:')):
