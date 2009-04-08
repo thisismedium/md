@@ -32,6 +32,11 @@ Memory
    used.  To use a custom :class:`Memory`, pass the custom instance as
    the first argument.
 
+.. function:: use([mem])
+
+   A context manager that temporarily shadows the active memory for
+   the dynamic extent of the context.
+
 .. class:: memory([name, check_read=True, check_write=True])
 
    The default :class:`Memory` implementation.  The ``name`` argument
@@ -171,12 +176,12 @@ Transactions
       ...     s1 = save(tlist([1, 2, 3]))
       ...     c1 = save(cell(s1))
       >>> c1.value
-      [1, 2, 3]
+      tlist([1, 2, 3])
 
       >>> with transaction(autosave=False):
       ...     c1.value[1] = 20
       >>> c1.value
-      [1, 2, 3]
+      tlist([1, 2, 3])
 
    Save must be called on the cursor that's changed.  Calling save on
    a cursor referring to a changed cursor won't work.
@@ -186,16 +191,16 @@ Transactions
       >>> with transaction(autosave=False):
       ...     c1.value[1] = 20
       ...     save(c1.value)
-      [1, 20, 3]
+      tlist([1, 20, 3])
       >>> c1.value
-      [1, 20, 3]
+      tlist([1, 20, 3])
 
       >>> with transaction(autocommit=False, autosave=False):
       ...     c1.value[2] = 30
       ...     save(c1)
-      <cell [1, 20, 30]>
+      <cell tlist([1, 20, 30])>
       >>> c1
-      <cell [1, 20, 3]>
+      <cell tlist([1, 20, 3])>
 
    Leaving the ``autosave`` argument set to ``True`` is convenient for
    "always commit everything" transactions.
@@ -205,7 +210,7 @@ Transactions
       >>> with transaction():
       ...     c2 = cell(tlist(['a', 'b', 'c']))
       >>> c2.value
-      ['a', 'b', 'c']
+      tlist(['a', 'b', 'c'])
 
 .. function:: rollback([what]) -> what
 
@@ -229,13 +234,13 @@ Transactions
       ...         c2.value[1] = 'Y'
       ...         print save(c2.value), '(nested2 save)'
       ...     print c2.value, '(after nested2 save)'
-      ['a', 'b', 'c'] (nested)
-      ['A', 'b', 'c'] (after nested; no save)
-      ['a', 'b', 'c'] (rollback)
-      ['Z', 'b', 'c'] (saved)
-      ['Z', 'b', 'c'] (nested2)
-      ['Z', 'Y', 'c'] (nested2 save)
-      ['Z', 'Y', 'c'] (after nested2 save)
+      tlist(['a', 'b', 'c']) (nested)
+      tlist(['A', 'b', 'c']) (after nested; no save)
+      tlist(['a', 'b', 'c']) (rollback)
+      tlist(['Z', 'b', 'c']) (saved)
+      tlist(['Z', 'b', 'c']) (nested2)
+      tlist(['Z', 'Y', 'c']) (nested2 save)
+      tlist(['Z', 'Y', 'c']) (after nested2 save)
 
 .. function:: commit()
 
@@ -274,11 +279,11 @@ Transactions
       ...     print list(saved()), list(unsaved())
       ...     save()
       ...     print list(saved()), list(unsaved())
-      [] [[10, 20, 3], ['Z', 'B', 'c']]
-      [[10, 20, 3], ['Z', 'B', 'c']] []
+      [] [tlist([10, 20, 3]), tlist(['Z', 'B', 'c'])]
+      [tlist([10, 20, 3]), tlist(['Z', 'B', 'c'])] []
 
       >>> c2.value
-      ['Z', 'B', 'c']
+      tlist(['Z', 'B', 'c'])
 
 Persistence
 -----------

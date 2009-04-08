@@ -15,6 +15,7 @@ class change(namedtuple('changes', 'cursor orig state'), Change):
 
 class memory(Memory):
     LogType = weaklog
+    name = None
 
     def __init__(self, name='*memory*', check_read=True, check_write=True):
 	self.name = name
@@ -29,16 +30,23 @@ class memory(Memory):
     def __str__(self):
 	return self.name
 
+    def begin(self, nested):
+	pass
+
+    def committed(self):
+	pass
+
     def allocate(self, cursor, state):
 	self.mem.allocate(cursor, state)
 
     def read_saved(self, cursor):
 	return self.mem[cursor]
 
-    def commit_changes(self, read, changed):
+    def commit_changes(self, nested):
 	with self.write_lock:
-	    self.verify_read(read)
-	    self.write_changes(self.verify_write(changed))
+	    self.verify_read(nested.read())
+	    self.write_changes(nested, self.verify_write(nested.changed()))
+	    nested.committed()
 
     def verify_read(self, read):
 	if self.check_read:
@@ -50,24 +58,46 @@ class memory(Memory):
 	else:
 	    return unverified_write(changed)
 
-    def write_changes(self, changed):
-	self.mem.update(changed)
+    def write_changes(self, nested, changed):
+	for (cursor, state) in changed:
+	    if is_deleted(state):
+		self.mem.pop(cursor, None)
+	    else:
+		self.mem[cursor] = state
 
 class journal(Journal):
     LogType = log
+    name = None
     source = None
 
     def __init__(self, name, source):
+	self.name = name
 	self.source = source
 	self.read_log = self.LogType()
 	self.commit_log = self.LogType()
 	self.write_log = self.LogType()
+
+	## Aggressively notify even though there's no activity yet.
+	## This simplifies weird situations like insert-only or
+	## delete-only transactions.
+	self.begun = False; self.notify()
 
     def __repr__(self):
 	return '<%s %s>' % (type(self).__name__, str(self))
 
     def __str__(self):
 	return self.name
+
+    def begin(self, nested):
+	self.notify()
+
+    def notify(self):
+	if not self.begun:
+	    self.source.begin(self)
+	    self.begun = True
+
+    def committed(self):
+	self.begun = False
 
     def allocate(self, cursor, state):
 	self.commit_log.allocate(cursor, state)
@@ -85,6 +115,7 @@ class journal(Journal):
 	    try:
 		return self.read_log[cursor]
 	    except KeyError:
+		self.notify()
 		return log_read(self, cursor)
 
     def write(self, cursor):
@@ -102,11 +133,12 @@ class journal(Journal):
     def revert_state(self, cursor):
 	self.write_log.pop(cursor, None)
 
-    def commit_changes(self, read_log, changed):
+    def commit_changes(self, nested):
 	## A journal is single-threaded; state can be blindly copied
 	## in.
-	for (cursor, orig, state) in changed:
+	for (cursor, orig, state) in nested.changed():
 	    commit_log(self, cursor, state)
+	nested.committed()
 
     def unsaved(self):
 	return (
@@ -142,7 +174,7 @@ def read_saved(journal, cursor, *default):
 def commit_changes(source, nested):
     if source is nested:
 	raise RuntimeError("A journal can't be committed to itself.")
-    source.commit_changes(nested.read(), nested.changed())
+    source.commit_changes(nested)
 
 def write(journal, cursor):
     return good_value(cursor, journal.write(cursor))
@@ -169,6 +201,9 @@ copy_state = copy.deepcopy
 class sentinal(object):
     __slots__ = ()
 
+    def __copy__(self):
+	return self
+
     def __deepcopy__(self, memo):
 	return self
 
@@ -183,6 +218,12 @@ def good_value(cursor, value, *default):
 	    raise ValueError, cursor
     else:
 	return value
+
+def is_deleted(obj):
+    return obj is DELETED
+
+def is_inserted(obj):
+    return obj is INSERTED
 
 
 ### Logged Operations

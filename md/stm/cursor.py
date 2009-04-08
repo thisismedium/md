@@ -7,10 +7,7 @@ from .journal import copy_state
 
 __all__ = ('cursor', 'tdict', 'tlist', 'tset')
 
-
-### Simple Cursor
-
-class cursor(Cursor):
+class _cursor(Cursor):
     __slots__ = ()
     StateType = dict
 
@@ -28,6 +25,16 @@ class cursor(Cursor):
 
     def __copy__(self):
 	return allocated(type(self), copy_state(readable(self)))
+
+def allocated(cls, state):
+    if not isinstance(state, cls.StateType):
+	state = cls.StateType(state)
+    return allocate(object.__new__(cls), state)
+
+
+### Simple Cursor
+
+class cursor(_cursor):
 
     def __getattr__(self, key):
 	try:
@@ -48,17 +55,9 @@ class cursor(Cursor):
 	    raise AttributeError, key
 
 
-### Pickling
-
-def allocated(cls, state):
-    if not isinstance(state, cls.StateType):
-	state = cls.StateType(state)
-    return allocate(object.__new__(cls), state)
-
-
 ### Collections
 
-class _collection(cursor):
+class _collection(_cursor):
 
     def __contains__(self, item):
 	return item in readable(self)
@@ -67,7 +66,10 @@ class _collection(cursor):
 	return iter(readable(self))
 
     def __repr__(self):
-	return repr(readable(self))
+	data = readable(self)
+	if not data:
+	    return '%s()' % type(self).__name__
+	return '%s([%s])' % (type(self).__name__, ', '.join(repr(x) for x in data))
 
     def __lt__(self, other):
 	return readable(self).__lt__(self.__cast(other))
@@ -141,7 +143,7 @@ class tlist(_collection, MutableSequence):
 	return writable(self).__imul__(n)
 
     def __cast(self, other):
-	return readable(self) if isinstance(other, tlist) else other
+	return readable(other) if isinstance(other, tlist) else other
 
     def __coerce(self, other):
 	if isinstance(other, tlist):
@@ -185,6 +187,12 @@ class tdict(_collection, MutableMapping):
 	    self.update(dict)
 	if kwargs:
 	    self.update(kwargs)
+
+    def __repr__(self):
+	data = readable(self)
+	if not data:
+	    return '%s()' % type(self).__name__
+	return '%s([%s])' % (type(self).__name__, ', '.join(repr(x) for x in data.iteritems()))
 
     def __getitem__(self, key):
 	data = readable(self)
@@ -246,7 +254,7 @@ class tdict(_collection, MutableMapping):
 	    return
 	data = writable(self)
 	if dict: data.update(dict)
-	if kwargs: data.update(dict)
+	if kwargs: data.update(kwargs)
 
     def values(self):
 	return readable(self).values()
@@ -259,7 +267,7 @@ class tset(_collection, MutableSet):
 	    self.update(seq)
 
     def __and__(self, other):
-	return readable(self) & self.__coerce(other)
+	return readable(self).__and__(self.__coerce(other))
 
     def __iand__(self, other):
 	return writable(self).__iand__(self.__coerce(other))
@@ -286,13 +294,13 @@ class tset(_collection, MutableSet):
 	return readable(self).__rxor__(self.__coerce(other))
 
     def __sub__(self, other):
-	return readable(self) - self.__coerce(other)
+	return readable(self).__sub__(self.__coerce(other))
 
     def __xor__(self, other):
-	return readable(self) ^ self.__coerce(other)
+	return readable(self).__xor__(self.__coerce(other))
 
     def __cast(self, other):
-	return readable(self) if isinstance(other, tlist) else other
+	return readable(other) if isinstance(other, tlist) else other
 
     def __coerce(self, other):
 	if isinstance(other, tlist):

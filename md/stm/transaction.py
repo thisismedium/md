@@ -8,15 +8,16 @@ from .journal import *
 __all__ = (
     'initialize',
     'allocate', 'readable', 'writable', 'delete',
-    'transaction', 'transactionally', 'save', 'rollback', 'commit', 'abort',
+    'use', 'transaction', 'transactionally',
+    'save', 'rollback', 'commit', 'abort',
     'saved', 'unsaved'
 )
 
 def initialize(mem=None):
-    journal = CURRENT_JOURNAL.value
+    journal = JOURNAL.value
     if journal is not None and not isinstance(journal, Memory):
 	raise RuntimeError('Cannot uninitialize a transaction', journal)
-    CURRENT_JOURNAL.value = mem or memory()
+    JOURNAL.value = mem or memory()
 
 
 ### Transasctional Data Type Operations
@@ -36,10 +37,14 @@ def delete(cursor):
 
 ### Transactions
 
+def use(mem=None):
+    assert isinstance(mem, Memory)
+    return current_journal(mem or memory())
+
 @contextmanager
 def transaction(name='*nested*', autocommit=True, autosave=True):
     try:
-	with CURRENT_JOURNAL.let(journal(name, current_journal())):
+	with current_journal(journal(name, current_journal())):
 	    yield
 	    if autosave: save()
 	    if autocommit: commit()
@@ -49,7 +54,7 @@ def transaction(name='*nested*', autocommit=True, autosave=True):
 def transactionally(proc, *args, **kwargs):
     limit = kwargs.pop('__attempts__', 3)
     autocommit = kwargs.pop('autocommit', True)
-    autosave= kwargs.pop('autosave', True)
+    autosave = kwargs.pop('autosave', True)
 
     for attempt in xrange(limit):
 	try:
@@ -83,11 +88,8 @@ def unsaved():
 
 ### Journal
 
-CURRENT_JOURNAL = fluid.cell(None, type=fluid.private)
-
-@fluid.accessor(None)
-def current_journal():
-    return CURRENT_JOURNAL.value
+JOURNAL = fluid.cell(None, type=fluid.private)
+current_journal = fluid.accessor('fluid', JOURNAL, require=True)
 
 def current_memory():
     journal = current_journal()

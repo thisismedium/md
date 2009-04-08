@@ -27,8 +27,21 @@ class Journal(object):
     __slots__ = ()
 
     @abstractproperty
+    def name(self):
+	"""The name of this transaction."""
+
+    @abstractproperty
     def source(self):
 	"""The journal this journal derives from."""
+
+    @abstractmethod
+    def begin(self, nested):
+	"""Nested journals must call self.source.begin(self)."""
+
+    @abstractmethod
+    def committed(self):
+	"""The source must call this method after a successful
+	commit."""
 
     @abstractmethod
     def allocate(self, cursor, state):

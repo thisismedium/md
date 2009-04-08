@@ -167,7 +167,7 @@ persistent id associated with a cursor.
 
    >>> del foo; collect()
    >>> foo = fetch('foo'); foo.a
-   {'value': 'A'}
+   pdict([('value', 'A')])
 
 Unsaved or uncommitted changes are not written to the backing store.
 
@@ -178,7 +178,7 @@ Unsaved or uncommitted changes are not written to the backing store.
 
    >>> del foo; collect()
    >>> fetch('foo').a
-   {'value': 'A'}
+   pdict([('value', 'A')])
 
 Normal cursors and persistent cursors can be mixed.  When normal
 cursors or plain data are used, they are persisted as "part of" the
@@ -193,20 +193,20 @@ identity.
 
    >>> del bar; collect()
    >>> bar = fetch('bar'); bar.b
-   {'value': ['B']}
+   tdict([('value', tlist(['B']))])
 
    >>> with transaction():
    ...     bar.b['value'].append('B2')
    >>> bar.b
-   {'value': ['B', 'B2']}
+   tdict([('value', tlist(['B', 'B2']))])
 
    >>> with transaction():
    ...     bar.b['value'].append('B3')
    ...     print rollback(bar.b['value']), '(rolled back)'
    ...     bar.b['mumble'] = 'quux'
-   ['B', 'B2'] (rolled back)
+   tlist(['B', 'B2']) (rolled back)
    >>> sorted(bar.b.items())
-   [('mumble', 'quux'), ('value', ['B', 'B2'])]
+   [('mumble', 'quux'), ('value', tlist(['B', 'B2']))]
 
 .. doctest::
    :hide:

@@ -3,7 +3,7 @@ import os, shelve, uuid, weakref, copy
 from collections import Iterator
 from md import stm
 from md.stm.transaction import current_memory
-from md.stm.journal import alloc, copy_state
+from md.stm.journal import alloc, copy_state, is_deleted
 
 __all__ = (
     'pid', 'pcursor', 'pdict', 'plist', 'pset',
@@ -96,18 +96,22 @@ class shelf(stm.memory):
 	except KeyError:
 	    return load_state(self, cursor)
 
-    def write_changes(self, changed):
+    def write_changes(self, nested, changed):
 	if isinstance(changed, Iterator):
 	    changed = list(changed)
-	super(shelf, self).write_changes(changed)
-	self.store_changes(changed)
+	super(shelf, self).write_changes(nested, changed)
+	self.store_changes(nested, changed)
 
-    def store_changes(self, changed):
+    def store_changes(self, nested, changed):
 	## Store (cls, state) tuples rather than directly pickling a
 	## cursor.  Pickling it would only make a lazy reference.
 	for (cursor, state) in changed:
 	    if isinstance(cursor, PCursor):
-		self.store[verify_pid(self, cursor)] = (type(cursor), state)
+		key = verify_pid(self, cursor)
+		if is_deleted(state):
+		    del self.store[key]
+		else:
+		    self.store[key] = (type(cursor), state)
 	self.store.sync()
 
     def delayed(self, cls, id):

@@ -2,7 +2,6 @@ from __future__ import absolute_import
 import threading
 from weakref import WeakKeyDictionary
 from contextlib import contextmanager
-from functools import wraps
 from abc import ABCMeta, abstractmethod
 
 __all__ = ('cell', 'let', 'accessor', 'shared', 'copied', 'private')
@@ -13,19 +12,19 @@ def cell(value, validate=None, type=None):
 def let(*bindings):
     return LOCAL_ENV.bind(*bindings)
 
-def accessor(default):
+def accessor(name, cell, require=False):
     """Decorate an accessor procedure to raise a ValueError if it
     returns default."""
-    def decorator(proc):
-	name = proc.__name__
-	def access(*args, **kwargs):
-	    value = proc(*args, **kwargs)
-	    if value == default:
-		raise ValueError('missing value for %s' % name)
-	    else:
-		return value
-	return wraps(proc)(access)
-    return decorator
+
+    def access(*value):
+	if value:
+	    return cell.let(*value)
+	elif require and cell.value == cell.original:
+	    raise ValueError('%s: missing value' % name)
+	return cell.get()
+
+    access.__name__ = name
+    return access
 
 
 ### Environmnent
@@ -145,9 +144,7 @@ class Cell(object):
     def __init__(self, value, validate=None):
 	self.validate = validate or identity
 	self.default = location(self.validate(value))
-
-    def __call__(self):
-	return self.get()
+	self.original = value
 
     @abstractmethod
     def __localize__(self):
@@ -166,7 +163,7 @@ class Cell(object):
 
 class private(Cell):
     def __localize__(self, loc):
-	return location(self.default.value)
+	return location(self.original)
 
 class shared(Cell):
     def __localize__(self, loc):

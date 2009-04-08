@@ -84,16 +84,6 @@ Fluid Cells
 	 10
 	 >>> BASE.value = 16
 
-   .. method:: __call__()
-
-      Return the current value of this cell.  This is an alternative
-      to using :attr:`Cell.value` reminicent of :class:`weakref.ref`.
-
-      .. doctest::
-
-      	 >>> BASE()
-	 16
-
    .. method:: let(value) -> context
 
       Bind the cell to ``value`` for the extent of the context.
@@ -206,13 +196,22 @@ Utilities
       ...     multiply("11")
       9
 
-.. function:: accessor(default) -> decorator
+.. function:: accessor(name, cell, require=False) -> access
 
-   It's often preferable not to export a fluid cell directly from a
-   module, but it's sometimes convenient both to access the current
-   value of a cell and ensure it has a usable value.  The
-   :func:`accessor` decorator raises a :exc:`ValueError` if the
-   accessed value is equal to ``default``.
+   The two most common actions on a fluid cell are getting its value
+   or creating a binding in a new dynamic context.  An accessor closes
+   over a cell.  When it is called with no arguments, the value of the
+   cell is returned.  When called with one argument (a new value), a
+   context manager is returned that binds the cell to the new value.
+   If ``require=True`` and the value of the cell is accessed and it is
+   still the default value, a value error is raised.
+
+   .. doctest::
+
+      >>> multiplier = fluid.accessor('multipler', MULTIPLIER)
+      >>> with multiplier(20):
+      ...    multiplier()
+      20
 
 Example: a parameterized database connection
 --------------------------------------------
@@ -227,17 +226,11 @@ connection is parameterized through the dynamic environment.
       >>> from contextlib import contextmanager
 
       >>> CONNECTION = fluid.cell(None)
-
-      >>> @fluid.accessor(CONNECTION.value)
-      ... def current_connection():
-      ...     return CONNECTION.value
-
-      >>> def connection(conn):
-      ...     return CONNECTION.let(conn)
+      >>> connection = fluid.accessor('connection', CONNECTION, require=True)
 
       >>> @contextmanager
       ... def autocommitted():
-      ...     conn = current_connection()
+      ...     conn = connection()
       ...     yield conn.cursor()
       ...     conn.commit()
 
@@ -253,7 +246,7 @@ connection is parameterized through the dynamic environment.
       ...         )
 
       >>> def get_data():
-      ...     cursor = current_connection().cursor()
+      ...     cursor = connection().cursor()
       ...     cursor.execute('SELECT value from data ORDER BY value;')
       ...     return (r[0] for r in cursor)
 
