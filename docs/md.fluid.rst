@@ -146,15 +146,15 @@ default.
       worker1 banana (after change)
       parent banana (workers done)
 
-.. class:: aquired
+.. class:: acquired
 
-   The current value is aquired from the dynamic environment, but the
+   The current value is acquired from the dynamic environment, but the
    cell is bound to a new location containing the value.  Mutations of
    the original location will have no effect on the new location.
 
    .. doctest::
 
-      >>> P2 = fluid.cell('apple', type=fluid.aquired)
+      >>> P2 = fluid.cell('apple', type=fluid.acquired)
       >>> demo(P2)
       worker1 pineapple (wait for change)
       worker2 banana (changed)
@@ -163,7 +163,7 @@ default.
 
 .. class:: private
 
-   No binding is aquired from the dynamic environment.  The cell is
+   No binding is acquired from the dynamic environment.  The cell is
    bound to a new location containing its global value.
 
    .. doctest::
@@ -178,14 +178,14 @@ default.
 .. class:: copied
 .. class:: deepcopied
 
-   These types behave like :class:`aquired`, but they also copy (or
+   These types behave like :class:`acquired`, but they also copy (or
    deepcopy) the *value* of the binding in addition to creating a new
    location.  This is useful if the value of the cell is mutable and
-   the new environment should aquire a snapshot of the value.
+   the new environment should acquire a snapshot of the value.
 
    .. doctest::
 
-      >>> P4 = fluid.cell(type=fluid.aquired)
+      >>> P4 = fluid.cell(type=fluid.acquired)
       >>> P5 = fluid.cell(type=fluid.copied)
 
       >>> def worker3(a, b):

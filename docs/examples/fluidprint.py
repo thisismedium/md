@@ -11,8 +11,8 @@ __all__ = (
 ## Default to None.  This let's the cells play more nicely with code
 ## that changes sys.stdout/sys.stderr directly (like doctest).
 ## Binding directly to sys.stdout / sys.stderr is more ideal.
-CURRENT_OUTPUT_PORT = fluid.cell(None, type=fluid.aquired)
-CURRENT_INPUT_PORT = fluid.cell(None, type=fluid.aquired)
+CURRENT_OUTPUT_PORT = fluid.cell(None, type=fluid.acquired)
+CURRENT_INPUT_PORT = fluid.cell(None, type=fluid.acquired)
 
 def current_output_port():
     return CURRENT_OUTPUT_PORT.value or sys.stdout

@@ -30,16 +30,16 @@ serial datatype.
    ...         return self.value
 
 Concurrent operations on a shared :class:`serial` instance are
-simulated by forcing a thread to become inactive after aquiring the
+simulated by forcing a thread to become inactive after acquiring the
 next value of a sequence, but before committing its transaction.
 
-The ``worker1`` thread will aquire the value ``1`` and become
-inactive.  In the meantime, ``worker2`` aquires the values ``1`` and
+The ``worker1`` thread will acquire the value ``1`` and become
+inactive.  In the meantime, ``worker2`` acquires the values ``1`` and
 ``2`` and commits its transaction.  When ``worker1`` reactivates, it
 also gets the value ``2``, but when it tries to commit, a
 :exc:`CannotCommit` exception is raised because ``worker2`` already
 committed new state.  This forces the transaction in ``worker1`` to be
-re-run.  The second time, it succeeds and aquires the values ``3`` and
+re-run.  The second time, it succeeds and acquires the values ``3`` and
 ``4``.
 
 .. doctest::

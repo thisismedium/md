@@ -6,7 +6,7 @@ from abc import ABCMeta, abstractmethod
 
 __all__ = (
     'cell', 'let', 'accessor',
-    'shared', 'aquired', 'copied', 'deepcopied', 'private'
+    'shared', 'acquired', 'copied', 'deepcopied', 'private'
 )
 
 def UNDEFINED():
@@ -184,7 +184,7 @@ class shared(Cell):
     def localize(self, loc):
 	return loc
 
-class aquired(Cell):
+class acquired(Cell):
     def localize(self, loc):
 	return self.make_location(loc.value)
 
