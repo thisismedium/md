@@ -7,7 +7,7 @@ These scripts are included with the :mod:`md` module.
 ``pytest`` -- run :mod:`test` suites
 ------------------------------------
 
-usage: pytest [options] module ...
+usage: pytest [options] module-or-file ...
 
 This script runs tests found by :func:`test.pkg_suites` for the given
 modules.  This makes running tests for any package or module very
@@ -31,6 +31,16 @@ easy.  Run ``pytest --help`` to see the options.  For example:
 
    ----------------------------------------------------------------------
    Ran 3 tests in 0.087s
+
+Doctest files can be tested just as easily.
+
+.. code-block:: sh
+
+   %find docs -name '*.rst' | xargs pytest
+   ----------------------------------------------------------------------
+   Ran 9 tests in 1.683s
+
+   OK
 
 No special support is required by the modules being tested.  Here's an
 example of testing the ``pickle`` and ``pickletools`` modules build
