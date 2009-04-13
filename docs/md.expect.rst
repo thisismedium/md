@@ -5,7 +5,7 @@
 .. module:: expect
    :synopsis: Very primitive type checking.
 
-This module implements a slightly more declarative and abstract
+This module implements a slightly more declarative and unified
 interface for these two scenarios:
 
 .. code-block:: python
