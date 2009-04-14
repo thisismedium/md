@@ -30,6 +30,9 @@ class memory(Memory):
     def __str__(self):
 	return self.name
 
+    def __contains__(self, cursor):
+	return cursor in self.mem
+
     def begin(self, nested):
 	pass
 
