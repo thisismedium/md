@@ -135,6 +135,24 @@ Inspecting
        >>> is_annotated(product)
        False
 
+.. function:: zip_annotations(procedure[, default]) -> Iterator
+
+   Zip the annotated parameters of ``procedure`` to their annotations
+   in parameter-order.  If ``default`` is given, unannotated
+   parameters are zipped to this value.
+
+   .. doctest::
+
+      >>> @annotated(str)
+      ... def partial(a, b):
+      ...     pass
+
+   >>> list(zip_annotations(partial))
+   [('a', <type 'str'>)]
+
+   >>> list(zip_annotations(partial, None))
+   [('a', <type 'str'>), ('b', None), ('return', None)]
+
 Compiling
 ---------
 
