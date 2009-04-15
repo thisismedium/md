@@ -195,7 +195,7 @@ See :doc:`examples/annotate` for examples.
 
    A decorator that can be used to create decorators that compile
    annotations.  If ``optimize_away`` is true, the compiler will not
-   be invoked with ``__debug__`` is ``False``.
+   be invoked when ``__debug__`` is ``False``.
 
 .. function:: compiled_with(procedure) -> compiler
 
