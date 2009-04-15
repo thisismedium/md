@@ -147,11 +147,11 @@ Inspecting
       ... def partial(a, b):
       ...     pass
 
-   >>> list(zip_annotations(partial))
-   [('a', <type 'str'>)]
+      >>> list(zip_annotations(partial))
+      [('a', <type 'str'>)]
 
-   >>> list(zip_annotations(partial, None))
-   [('a', <type 'str'>), ('b', None), ('return', None)]
+      >>> list(zip_annotations(partial, None))
+      [('a', <type 'str'>), ('b', None), ('return', None)]
 
 Compiling
 ---------
