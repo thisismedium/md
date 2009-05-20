@@ -6,7 +6,7 @@ from .interfaces import *
 from .journal import *
 
 __all__ = (
-    'initialize',
+    'initialize', 'current_journal', 'current_memory',
     'allocate', 'readable', 'writable', 'delete',
     'use', 'transaction', 'transactionally',
     'save', 'rollback', 'commit', 'abort',
@@ -32,18 +32,20 @@ def delete(cursor):
 ### Transactions
 
 def use(mem=None):
-    assert isinstance(mem, Memory)
+    assert isinstance(mem, Memory), 'mem: %s' % mem
     return current_journal(mem or memory())
 
 @contextmanager
 def transaction(name='*nested*', autocommit=True, autosave=True):
     try:
-	with current_journal(journal(name, current_journal())):
-	    yield
-	    if autosave: save()
-	    if autocommit: commit()
+        with current_journal(current_journal().make_journal(name)):
+            yield
+            if autosave:
+                autosave if callable(autosave) else save()
+            if autocommit:
+                autocommit() if callable(autocommit) else commit()
     except Abort:
-	pass
+        pass
 
 def transactionally(proc, *args, **kwargs):
     limit = kwargs.pop('__attempts__', 3)
@@ -51,15 +53,15 @@ def transactionally(proc, *args, **kwargs):
     autosave = kwargs.pop('autosave', True)
 
     for attempt in xrange(limit):
-	try:
-	    with transaction(autocommit=autocommit, autosave=autosave):
-		return proc(*args, **kwargs)
-	except CannotCommit as exc:
-	    pass
+        try:
+            with transaction(autocommit=autocommit, autosave=autosave):
+                return proc(*args, **kwargs)
+        except CannotCommit as exc:
+            pass
     raise exc
 
-def save(what=None):
-    change_state(save_state, current_journal(), what or unsaved())
+def save(what=None, force=False):
+    change_state(save_state, current_journal(), what or unsaved(), force)
     return what
 
 def commit(journal=None):
@@ -84,14 +86,14 @@ def unsaved():
 
 class acquire_memory(fluid.acquired):
     def localize(self, loc):
-	if isinstance(loc.value, Journal):
-	    return self.make_location(find_memory(loc.value))
-	else:
-	    return super(acquire_memory, self).localize(loc)
+        if isinstance(loc.value, Journal):
+            return self.make_location(find_memory(loc.value))
+        else:
+            return super(acquire_memory, self).localize(loc)
 
 def find_memory(journal):
     while journal.source:
-	journal = journal.source
+        journal = journal.source
     return journal
 
 JOURNAL = fluid.cell(type=acquire_memory)
@@ -104,5 +106,5 @@ def current_memory():
 def initialize(mem=None):
     journal = JOURNAL.value
     if isinstance(journal, Journal) and not isinstance(journal, Memory):
-	raise RuntimeError('Cannot uninitialize a transaction', journal)
+        raise RuntimeError('Cannot uninitialize a transaction', journal)
     JOURNAL.value = mem or memory()
