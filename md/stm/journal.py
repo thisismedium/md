@@ -17,8 +17,8 @@ def alloc(journal, cursor, state):
     journal.allocate(cursor, state)
     return cursor
 
-def dealloc(journal, cursor, state):
-    journal.delete(cursor, state)
+def dealloc(journal, cursor):
+    journal.delete(cursor)
 
 def read_unsaved(journal, cursor):
     return good_value(cursor, journal.read_unsaved(cursor))
@@ -104,11 +104,14 @@ class journal(Journal):
         try:
             return self.commit_log[cursor]
         except KeyError:
-            try:
-                return self.read_log[cursor]
-            except KeyError:
-                self.notify()
-                return log_read(self, cursor)
+            return self._read(cursor)
+
+    def _read(self, cursor):
+        try:
+            return self.read_log[cursor]
+        except KeyError:
+            self.notify()
+            return log_read(self, cursor)
 
     def write(self, cursor):
         try:
@@ -117,6 +120,7 @@ class journal(Journal):
             return log_write(self, cursor)
 
     def delete(self, cursor):
+        self._read(cursor) ## Make sure this has been read in
         log_delete(self, cursor)
 
     def save_state(self, cursor, force=False):
@@ -252,7 +256,13 @@ class memory(Memory):
 copy_state = copy.deepcopy
 
 class sentinal(object):
-    __slots__ = ()
+    __slots__ = ('name')
+
+    def __init__(self, name):
+        self.name = name
+
+    def __repr__(self):
+        return '<%s %s>' % (type(self).__name__, self.name)
 
     def __copy__(self):
         return self
@@ -260,15 +270,15 @@ class sentinal(object):
     def __deepcopy__(self, memo):
         return self
 
-INSERTED = sentinal()
-DELETED = sentinal()
+INSERTED = sentinal('inserted')
+DELETED = sentinal('deleted')
 
 def good_value(cursor, value, *default):
     if value is INSERTED or value is DELETED:
         if default:
             return default[0]
         else:
-            raise ValueError, cursor
+            raise ValueError, id(cursor)
     else:
         return value
 
