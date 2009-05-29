@@ -121,7 +121,8 @@ class tlist(_collection):
     StateType = list
 
     def __init__(self, seq=()):
-        self.extend(seq)
+        if seq:
+            self.extend(seq)
 
     def __getslice__(self, i, j):
         return allocated(type(self), readable(self).__getslice__(i, j))
