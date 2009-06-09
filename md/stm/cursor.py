@@ -339,8 +339,9 @@ class tset(_collection):
     def difference_update(self, *args):
         return writable(self).difference_update(*args)
 
-    def discard(self, *args):
-        return writable(self).discard(*args)
+    def discard(self, elem):
+        if elem in self:
+            writable(self).discard(elem)
 
     def intersection(self, *args):
         return readable(self).intersection(*args)
