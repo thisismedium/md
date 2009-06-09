@@ -3,12 +3,13 @@ from abc import ABCMeta, abstractproperty, abstractmethod
 from collections import namedtuple, Iterable, Container
 
 __all__ = (
-    'CannotCommit', 'Abort',
+    'CannotCommit', 'Abort', 'NeedsTransaction',
     'Cursor', 'Static', 'Journal', 'Memory', 'Change', 'Log'
 )
 
 class CannotCommit(RuntimeError): pass
 class Abort(Exception): pass
+class NeedsTransaction(Exception): pass
 
 class Cursor(object):
     __metaclass__ = ABCMeta
@@ -93,7 +94,7 @@ class Journal(object):
         read-log."""
 
 def needs_transaction(*args, **kwargs):
-    raise NotImplementedError(
+    raise NeedsTransaction(
         'This operation needs to be run in a transaction.'
     )
 
