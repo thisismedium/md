@@ -104,9 +104,9 @@ class journal(Journal):
         try:
             return self.commit_log[cursor]
         except KeyError:
-            return self._read(cursor)
+            return self.read_source(cursor)
 
-    def _read(self, cursor):
+    def read_source(self, cursor):
         try:
             return self.read_log[cursor]
         except KeyError:
@@ -120,7 +120,6 @@ class journal(Journal):
             return log_write(self, cursor)
 
     def delete(self, cursor):
-        self._read(cursor) ## Make sure this has been read in
         log_delete(self, cursor)
 
     def save_state(self, cursor, force=False):
