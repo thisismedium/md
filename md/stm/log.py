@@ -142,7 +142,7 @@ class weaklog(log):
             return False
 
     def iterkeys(self):
-        for entry in self.entries.itervalues():
+        for entry in self.entries.values():
             cursor = entry()
             if cursor:
                 yield cursor

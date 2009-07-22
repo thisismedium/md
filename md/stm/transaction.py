@@ -41,7 +41,7 @@ def transaction(name='*nested*', autocommit=True, autosave=True):
         with current_journal(current_journal().make_journal(name)):
             yield
             if autosave:
-                autosave if callable(autosave) else save()
+                autosave() if callable(autosave) else save()
             if autocommit:
                 autocommit() if callable(autocommit) else commit()
     except Abort:
