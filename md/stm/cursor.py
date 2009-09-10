@@ -99,8 +99,9 @@ class _collection(_cursor):
     def __ge__(self, other):
         return readable(self).__ge__(self._cast(other))
 
-    def __cmp__(self, other):
-        return readable(self).__cmp__(self._cast(other))
+    ## __cmp__ is not defined on lists.
+    # def __cmp__(self, other):
+    #     return readable(self).__cmp__(self._cast(other))
 
     __hash__ = None
 
