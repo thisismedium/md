@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name = 'md',
-    version = '0.1',
+    version = 'latest',
     description = 'A collection of Python utilities.',
     author = 'Medium',
     author_email = 'labs@thisismedium.com',
@@ -17,11 +17,11 @@ setup(
     test_suite = 'tests.all',
 
     classifiers = [
-	'Development Status :: 3 - Alpha',
-	'Intended Audience :: Developers',
-	'License :: OSI Approved :: BSD License',
-	'Operating System :: OS Independent',
-	'Programming Language :: Python',
-	'Topic :: Utilities'
+        'Development Status :: 3 - Alpha',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: BSD License',
+        'Operating System :: OS Independent',
+        'Programming Language :: Python',
+        'Topic :: Utilities'
     ]
 )

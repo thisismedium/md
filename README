@@ -1,0 +1,14 @@
+md.py
+-----
+
+This package is a library of language-level features for
+Python. Features include transactional memory, a dynamic environment,
+and a simple testing framework.
+
+More Information
+----------------
+
+  * Github: http://github.com/thisismedium/md/tree/master
+  * Project Page: http://thisismedium.com/labs/mdpy/
+  * Documentation: http://docs.thisismedium.com/md/
+
