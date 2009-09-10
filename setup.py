@@ -2,12 +2,12 @@ from __future__ import absolute_import
 from setuptools import setup, find_packages
 
 setup(
-    name = 'md',
+    name = 'md.py',
     version = 'latest',
     description = 'A collection of Python utilities.',
     author = 'Medium',
     author_email = 'labs@thisismedium.com',
-    url = 'http://thisismedium.com/labs/md/',
+    url = 'http://thisismedium.com/labs/mdpy/',
     license = 'BSD',
     keywords = 'utilities transaction transactions fluid dynamic',
 
