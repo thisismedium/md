@@ -277,7 +277,7 @@ def good_value(cursor, value, *default):
         if default:
             return default[0]
         else:
-            raise ValueError, id(cursor)
+            raise ValueError('%s %s has been %s.' % (type(cursor).__name__, id(cursor), value.name))
     else:
         return value
 
