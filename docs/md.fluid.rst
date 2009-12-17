@@ -125,10 +125,12 @@ default.
    >>> def demo(cell):
    ...     t1 = threading.Thread(target=lambda: worker1(cell))
    ...     t2 = threading.Thread(target=lambda: worker2(cell))
+   ...     show('demo', 'initial', cell)
    ...     with cell.let('pineapple'):
    ...     	t1.start(); t2.start()
    ...     	t1.join()
    ...          show('parent', 'workers done', cell)
+   ...     show('demo', 'final', cell)
 
 .. class:: shared
 
@@ -141,10 +143,12 @@ default.
 
       >>> P1 = fluid.cell('apple')
       >>> demo(P1)
+      demo apple (initial)
       worker1 pineapple (wait for change)
       worker2 banana (changed)
       worker1 banana (after change)
       parent banana (workers done)
+      demo apple (final)
 
 .. class:: acquired
 
@@ -156,10 +160,12 @@ default.
 
       >>> P2 = fluid.cell('apple', type=fluid.acquired)
       >>> demo(P2)
+      demo apple (initial)
       worker1 pineapple (wait for change)
       worker2 banana (changed)
       worker1 pineapple (after change)
       parent pineapple (workers done)
+      demo apple (final)
 
 .. class:: private
 
@@ -170,10 +176,12 @@ default.
 
       >>> P3 = fluid.cell('apple', type=fluid.private)
       >>> demo(P3)
+      demo apple (initial)
       worker1 apple (wait for change)
       worker2 banana (changed)
       worker1 apple (after change)
       parent pineapple (workers done)
+      demo apple (final)
 
 .. class:: copied
 .. class:: deepcopied
