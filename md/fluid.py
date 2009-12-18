@@ -54,7 +54,7 @@ class env(threading.local):
         make_top procedure must return a single frame."""
 
         self._global = global_frame
-        self.frames = [global_frame, make_top(self)]
+        self.reset(make_top(self))
 
     def define(self, cell, location):
         result = self._global.setdefault(cell, location)
@@ -118,18 +118,28 @@ class env(threading.local):
 
         return cls.FrameType(bindings)
 
-    def localize(self):
+    def localize(self, *frames):
         """Localize all dynamic binding and flatten them into a
         frame."""
 
-        return self.frame(localize(f.iteritems() for f in self.frames))
+        result = self.frame()
+        frames = frames or self.frames
+        index = len(frames) - 1
+        while index > -1:
+            frame = frames[index]
+            index -= 1
+            for cell in frame:
+                if cell in result:
+                    continue
+                loc = cell.localize(frame[cell])
+                if loc is not NotImplemented:
+                    result[cell] = loc
+        return result
 
-def localize(frames):
-    return (
-        (c, loc) for (c, orig, loc) in
-        ((c, loc, c.localize(loc)) for f in frames for (c, loc) in f)
-        if loc is not NotImplemented
-    )
+    def reset(self, top):
+        """Reset the dynamic environment."""
+
+        self.frames = [self._global, top]
 
 
 ### Thread Integration
@@ -167,13 +177,16 @@ def parent_environment(missing):
     t = threading.currentThread()
     try:
         frame = t.localized
-        del t.localized
     except AttributeError:
         frame = missing()
     return frame
 
 GLOBAL = env.FrameType()
 LOCAL = env(GLOBAL, lambda e: parent_environment(e.frame))
+
+def reset():
+    top = parent_environment(LOCAL.frame)
+    LOCAL.reset(LOCAL.localize(GLOBAL, top))
 
 
 ### Cells
