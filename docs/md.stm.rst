@@ -14,6 +14,7 @@ instance state.
 
 .. doctest::
 
+   >>> import __builtin__
    >>> from md.stm import *
 
 .. doctest::
@@ -105,7 +106,7 @@ Default :class:`Cursor` Implementation
    redefining the :attr:`cursor.StateType` attribute.
 
    >>> class sequence(cursor):
-   ...     StateType = list
+   ...     StateType = __builtin__.list
    ...
    ...     def __init__(self, seq=()):
    ...         self.extend(seq)
@@ -125,29 +126,34 @@ Default :class:`Cursor` Implementation
    ...     def extend(self, seq):
    ...         writable(self).extend(seq)
 
-.. class:: tdict(dict=None, **kwargs)
+.. class:: dict(dict=None, **kwargs)
 
    A transactional :class:`dict`.
 
-.. class:: tlist(seq=None)
+.. class:: tree(seq=None, **kwargs)
+
+   A transactional :class:`tree`.
+
+.. class:: omap(seq=None, **kwargs)
+
+   A transactional :class:`omap`.
+
+.. class:: list(seq=None)
 
    A transactional :class:`list`.
 
-.. class:: tset(seq=None)
+.. class:: set(seq=None)
 
    A transactional :class:`set`.
 
 Transactions
 ------------
 
-.. function:: transaction([name], autocommit=True, autosave=True)
+.. function:: transaction([name], autocommit=True)
 
    A transaction provides a context for transactional memory
-   operations.  Saving changed data writes the changes to a
-   transaction's save-log.  Committing a transaction writes saved
-   changes to the outer transaction's save-log.  A top-level
-   transaction operates against the transactional memory store.
-   Transactions may be nested.
+   operations.  Committing a transaction writes changes to the outer
+   transaction or memory.  Transactions may be nested.
 
 .. function:: transactionally(proc, *args, **kwargs)
 
@@ -158,89 +164,25 @@ Transactions
    arguments and returns the result of calling :obj:`proc`.
 
    :param __attempts__: The number of attempts to make (default: ``3``)
-   :param autosave: Passed to :func:`transaction` (default: ``True``)
    :param autocommit: Passed to :func:`transaction` (default: ``True``)
 
-.. function:: save([what]) -> what
+.. function:: rollback([what]) -> what
 
-   Transactions auto-commit and auto-save by default.  Use
-   :func:`save` to add changes that will be committed when auto-save
-   is disabled or before calling a nested transaction.  Unsaved
-   changes are discarded when the transaction is completed.  Without
-   any arguments, all :func:`unsaved` changes are saved.  Otherwise,
-   ``what`` may be a cursor or sequence of cursors.
-
-   .. doctest::
-
-      >>> with transaction(autosave=False):
-      ...     s1 = save(tlist([1, 2, 3]))
-      ...     c1 = save(cell(s1))
-      >>> c1.value
-      tlist([1, 2, 3])
-
-      >>> with transaction(autosave=False):
-      ...     c1.value[1] = 20
-      >>> c1.value
-      tlist([1, 2, 3])
-
-   Save must be called on the cursor that's changed.  Calling save on
-   a cursor referring to a changed cursor won't work.
-
-   .. doctest::
-
-      >>> with transaction(autosave=False):
-      ...     c1.value[1] = 20
-      ...     save(c1.value)
-      tlist([1, 20, 3])
-      >>> c1.value
-      tlist([1, 20, 3])
-
-      >>> with transaction(autocommit=False, autosave=False):
-      ...     c1.value[2] = 30
-      ...     save(c1)
-      <cell tlist([1, 20, 30])>
-      >>> c1
-      <cell tlist([1, 20, 3])>
-
-   Leaving the ``autosave`` argument set to ``True`` is convenient for
-   "always commit everything" transactions.
+   Revert a cursor to its original state.
 
    .. doctest::
 
       >>> with transaction():
-      ...     c2 = cell(tlist(['a', 'b', 'c']))
-      >>> c2.value
-      tlist(['a', 'b', 'c'])
+      ...     c1 = cell(list(['a', 'b', 'c']))
 
-.. function:: rollback([what]) -> what
-
-   Revert a cursor to its last saved state (the opposite of
-   :func:`save`).  When called with no arguments, all :func:`unsaved`
-   cursors are reverted.
-
-   .. doctest::
-
-      >>> with transaction(autosave=False):
-      ...     c2.value[0] = 'A'
-      ...     with transaction(autosave=False):
-      ...         print c2.value, '(nested)'
-      ...         c2.value[0] = 'Z'
-      ...     print c2.value, '(after nested; no save)'
-      ...     print rollback(c2.value), '(rollback)'
-      ...     c2.value[0] = 'Z'
-      ...     print save(c2.value), '(saved)'
-      ...     with transaction(autosave=False):
-      ...         print c2.value, '(nested2)'
-      ...         c2.value[1] = 'Y'
-      ...         print save(c2.value), '(nested2 save)'
-      ...     print c2.value, '(after nested2 save)'
-      tlist(['a', 'b', 'c']) (nested)
-      tlist(['A', 'b', 'c']) (after nested; no save)
-      tlist(['a', 'b', 'c']) (rollback)
-      tlist(['Z', 'b', 'c']) (saved)
-      tlist(['Z', 'b', 'c']) (nested2)
-      tlist(['Z', 'Y', 'c']) (nested2 save)
-      tlist(['Z', 'Y', 'c']) (after nested2 save)
+      >>> with transaction():
+      ...     print c1.value, '(originally)'
+      ...     c1.value[0] = 'Z'
+      ...     print c1.value, '(modified)'
+      ...     print rollback(c1.value), '(rollback)'
+      list(['a', 'b', 'c']) (originally)
+      list(['Z', 'b', 'c']) (modified)
+      list(['a', 'b', 'c']) (rollback)
 
 .. function:: commit()
 
@@ -262,28 +204,17 @@ Transactions
       >>> c3.value
       'apple'
 
-.. function:: saved()
+.. function:: changed()
 
-   Produce an iterator over the items in a transaction's save-log.
-
-.. function:: unsaved()
-
-   Produce an iterator over the items that need to be added to a
-   transaction's save-log.
+   Produce an iterator over items that have been changed in the
+   current transaction.
 
    .. doctest::
 
-      >>> with transaction(autosave=False):
-      ...     c1.value[0] = 10
-      ...     c2.value[1] = 'B'
-      ...     print list(saved()), list(unsaved())
-      ...     save()
-      ...     print list(saved()), list(unsaved())
-      [] [tlist([10, 20, 3]), tlist(['Z', 'B', 'c'])]
-      [tlist([10, 20, 3]), tlist(['Z', 'B', 'c'])] []
-
-      >>> c2.value
-      tlist(['Z', 'B', 'c'])
+      >>> with transaction():
+      ...     c1.value[1] = 'B'
+      ...     print '\\n'.join(repr(c) for c in changed())
+      list(['a', 'B', 'c'])
 
 Persistence
 -----------

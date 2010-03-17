@@ -1,17 +1,23 @@
 from __future__ import absolute_import
 import copy
-from collections import MutableSequence, MutableSet, MutableMapping
-from md.abc import implements
+from .. import abc
+from ..prelude import *
 from .interfaces import Cursor
 from .transaction import allocate, readable, writable
 from .journal import copy_state
 
-__all__ = ('cursor', 'tdict', 'tlist', 'tset')
+__all__ = ('cursor', 'dict', 'tree', 'omap', 'list', 'set')
 
-@implements(Cursor)
+_dict = dict
+_list = list
+_set = set
+_tree = tree
+_omap = omap
+
+@abc.implements(Cursor)
 class _cursor(object):
     __slots__ = ('__weakref__', )
-    StateType = dict
+    StateType = _dict
 
     def __new__(cls, *args, **kwargs):
         return allocated(cls, cls.StateType())
@@ -82,44 +88,40 @@ class _collection(_cursor):
         return '%s([%s])' % (type(self).__name__, ', '.join(repr(x) for x in data))
 
     def __lt__(self, other):
-        return readable(self).__lt__(self._cast(other))
+        return readable(self) < self._cast(other)
 
     def __le__(self, other):
-        return readable(self).__le__(self._cast(other))
+        return readable(self) <= self._cast(other)
 
     def __eq__(self, other):
-        return readable(self).__eq__(self._cast(other))
+        return readable(self) == self._cast(other)
 
     def __ne__(self, other):
-        return readable(self).__ne__(self._cast(other))
+        return readable(self) != self._cast(other)
 
     def __gt__(self, other):
-        return readable(self).__gt__(self._cast(other))
+        return readable(self) > self._cast(other)
 
     def __ge__(self, other):
-        return readable(self).__ge__(self._cast(other))
-
-    ## __cmp__ is not defined on lists.
-    # def __cmp__(self, other):
-    #     return readable(self).__cmp__(self._cast(other))
+        return readable(self) >= self._cast(other)
 
     __hash__ = None
 
     def __len__(self):
-        return readable(self).__len__()
+        return len(readable(self))
 
     def __getitem__(self, i):
-        return readable(self).__getitem__(i)
+        return readable(self)[i]
 
     def __setitem__(self, i, item):
-        return writable(self).__setitem__(i, item)
+        writable(self)[i] = item
 
     def __delitem__(self, i):
-        return writable(self).__delitem__(i)
+        del writable(self)[i]
 
-@implements(MutableSequence)
-class tlist(_collection):
-    StateType = list
+@abc.implements(MutableSequence)
+class list(_collection):
+    StateType = _list
 
     def __init__(self, seq=()):
         if seq:
@@ -135,20 +137,15 @@ class tlist(_collection):
         return writable(self).__delslice__(i, j)
 
     def __add__(self, other):
-        return allocated(
-            type(self), readable(self).__add__(self._coerce(other))
-        )
+        return allocated(type(self), readable(self) + self._coerce(other))
 
-    def __radd__(self, other):
-        return allocated(
-            type(self), readable(self).__radd__(self._coerce(other))
-        )
+    __radd__ = __add__
 
     def __iadd__(self, other):
         return writable(self).__iadd__(self._coerce(other))
 
     def __mul__(self, n):
-        return allocated(type(self), readable(self).__mul__(n))
+        return allocated(type(self), readable(self) * n)
 
     __rmul__ = __mul__
 
@@ -156,10 +153,10 @@ class tlist(_collection):
         return writable(self).__imul__(n)
 
     def _cast(self, other):
-        return readable(other) if isinstance(other, tlist) else other
+        return readable(other) if isinstance(other, list) else other
 
     def _coerce(self, other):
-        if isinstance(other, tlist):
+        if isinstance(other, list):
             return readable(other)
         elif isinstance(other, self.StateType):
             return other
@@ -193,14 +190,12 @@ class tlist(_collection):
     def extend(self, other):
         return writable(self).extend(self._cast(other))
 
-@implements(MutableMapping)
-class tdict(_collection):
+@abc.implements(MutableMapping)
+class dict(_collection):
 
     def __init__(self, dict=None, **kwargs):
-        if dict is not None:
-            self.update(dict)
-        if kwargs:
-            self.update(kwargs)
+        if dict is not None or kwargs:
+            self.update(dict, kwargs)
 
     def __repr__(self):
         data = readable(self)
@@ -209,15 +204,15 @@ class tdict(_collection):
         return '%s([%s])' % (type(self).__name__, ', '.join(repr(x) for x in data.iteritems()))
 
     def __getitem__(self, key):
-        data = readable(self)
-        if key in data:
-            return data[key]
-        if hasattr(type(self), '__missing__'):
+        try:
+            return readable(self)[key]
+        except KeyError:
+            if not hasattr(type(self), '__missing__'):
+                raise
             return self.__missing__(key)
-        raise KeyError(key)
 
     def _cast(self, other):
-        return readable(other) if isinstance(other, tdict) else other
+        return readable(other) if isinstance(other, dict) else other
 
     def clear(self):
         return writable(self).clear()
@@ -230,27 +225,25 @@ class tdict(_collection):
         return allocated(cls, ((k, value) for k in iterable))
 
     def get(self, key, default=None):
-        if key not in self:
-            return default
-        return self[key]
+        return readable(self).get(key, default)
 
     def has_key(self, key):
         return key in readable(self)
 
-    def items(self):
-        return readable(self).items()
+    def items(self, *args):
+        return readable(self).items(*args)
 
-    def iteritems(self):
-        return readable(self).iteritems()
+    def iteritems(self, *args):
+        return readable(self).iteritems(*args)
 
-    def iterkeys(self):
-        return readable(self).iterkeys()
+    def iterkeys(self, *args):
+        return readable(self).iterkeys(*args)
 
-    def itervalues(self):
-        return readable(self).itervalues()
+    def itervalues(self, *args):
+        return readable(self).itervalues(*args)
 
-    def keys(self):
-        return readable(self).keys()
+    def keys(self, *args):
+        return readable(self).keys(*args)
 
     def pop(self, key, *args):
         return writable(self).pop(key, *args)
@@ -259,66 +252,72 @@ class tdict(_collection):
         return writable(self).popitem()
 
     def setdefault(self, key, default=None):
-        if key not in self:
-            self[key] = default
-        return self[key]
+        try:
+            ## Only call writable() if necessary.
+            return self[key]
+        except KeyError:
+            return writable(self).setdefault(key, default)
 
     def update(self, dict=None, **kwargs):
-        if not (dict or kwargs):
-            return
-        data = writable(self)
-        if dict: data.update(dict)
-        if kwargs: data.update(kwargs)
+        if dict or kwargs:
+            writable(self).update(dict, **kwargs)
 
     def values(self):
         return readable(self).values()
 
-@implements(MutableSet)
-class tset(_collection):
-    StateType = set
+@abc.implements(MutableTree)
+class tree(dict):
+    StateType = _tree
+
+@abc.implements(MutableOrderedMap)
+class omap(dict):
+    StateType = _omap
+
+@abc.implements(MutableSet)
+class set(_collection):
+    StateType = _set
 
     def __init__(self, seq=None):
         if seq is not None:
             self.update(seq)
 
     def __and__(self, other):
-        return readable(self).__and__(self._coerce(other))
+        return readable(self) & self._coerce(other)
+
+    __rand__ = __and__
 
     def __iand__(self, other):
         return writable(self).__iand__(self._coerce(other))
 
+    def __or__(self, other):
+        return readable(self) | self._coerce(other)
+
+    __ror__ = __or__
+
     def __ior__(self, other):
         return writable(self).__ior__(self._coerce(other))
+
+    def __sub__(self, other):
+        return readable(self) - self._coerce(other)
+
+    __rsub__ = __sub__
 
     def __isub__(self, other):
         return writable(self).__isub__(self._coerce(other))
 
+    def __xor__(self, other):
+        return readable(self) ^ self._coerce(other)
+
+    __rxor__ = __xor__
+
     def __ixor__(self, other):
         return writable(self).__ixor__(self._coerce(other))
 
-    def __rand__(self, other):
-        return readable(self).__rand__(self._coerce(other))
-
-    def __ror__(self, other):
-        return readable(self).__ror__(self._coerce(other))
-
-    def __rsub__(self, other):
-        return readable(self).__rsub__(self._coerce(other))
-
-    def __rxor__(self, other):
-        return readable(self).__rxor__(self._coerce(other))
-
-    def __sub__(self, other):
-        return readable(self).__sub__(self._coerce(other))
-
-    def __xor__(self, other):
-        return readable(self).__xor__(self._coerce(other))
-
     def _cast(self, other):
-        return readable(other) if isinstance(other, tlist) else other
+        return readable(other) if isinstance(other, list) else other
 
     def _coerce(self, other):
-        if isinstance(other, tlist):
+        if isinstance(other, list):
             return readable(other)
         elif isinstance(other, self.StateType):
             return other

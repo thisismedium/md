@@ -4,15 +4,16 @@
 """_prelude -- additional builtins for internal use (see prelude.py)"""
 
 from __future__ import absolute_import
-import copy, collections as coll, itertools as it, functools as fn, \
-    contextlib as ctx
+import copy, itertools as it, functools as fn, contextlib as ctx
+import collections; from collections import *
 
-__all__ = (
+__all__ = tuple(collections.__all__) + (
     'partial', 'wraps', 'closing',
-    'Iterator', 'Sequence', 'chain', 'ichain', 'islice', 'takewhile',
-    'Mapping', 'MutableMapping', 'keys', 'values', 'items', 'chain_items',
+    'chain', 'ichain', 'islice', 'imap', 'takewhile',
+    'keys', 'values', 'items', 'chain_items',
     'update', 'updated',
-    'namedtuple', 'deque', 'sentinal', 'Undefined'
+    'sentinal', 'Sentinal', 'Undefined',
+    'adapt'
 )
 
 
@@ -25,9 +26,8 @@ closing = ctx.closing
 
 ### Sequences
 
-Iterator = coll.Iterator
-Sequence = coll.Sequence
 chain = it.chain
+imap = it.imap
 islice = it.islice
 takewhile = it.takewhile
 
@@ -36,9 +36,6 @@ def ichain(seq):
 
 
 ### Mapping
-
-Mapping = coll.Mapping
-MutableMapping = coll.MutableMapping
 
 def keys(obj):
     if isinstance(obj, Mapping):
@@ -66,9 +63,6 @@ def updated(obj, *args, **kw):
 
 ### Types
 
-namedtuple = coll.namedtuple
-deque = coll.deque
-
 class Sentinal(object):
     __slots__ = ('nonzero', )
 
@@ -81,8 +75,51 @@ class Sentinal(object):
     def __repr__(self):
         return '%s' % type(self).__name__
 
+    def __copy__(self):
+        return self
+
+    def __deepcopy__(self, memo):
+        return self
+
 def sentinal(name, **kw):
     cls = type(name, (Sentinal,), {})
     return cls(**kw)
 
 Undefined = sentinal('<undefined>', nonzero=False)
+
+
+### Adaptation
+
+def adapt(obj, cls, default=None):
+    """Adapt (cast) obj to cls.
+
+    This is an implementation of the PEAK adaptation interface:
+      Adaptation <http://www.python.org/dev/peps/pep-0246/>
+      PEAK Protocols <http://peak.telecommunity.com/protocol_ref/module-protocols.html>
+    """
+
+    if obj is None or isinstance(obj, cls):
+        return obj
+
+    try:
+        conform = getattr(obj, '__conform__', None)
+        value = conform and conform(cls)
+        if value is not None:
+            return value
+    except TypeError:
+        pass
+
+    try:
+        adapt = getattr(cls, '__adapt__', None)
+        value = adapt and adapt(obj)
+        if value is not None:
+            return value
+    except TypeError:
+        pass
+
+    if default is not None:
+        return default
+
+    raise ValueError('Cannot adapt %r. %r does not implement %r.' % (
+        obj, type(obj), cls
+    ))

@@ -4,7 +4,7 @@ from collections import namedtuple, Iterable, Container
 
 __all__ = (
     'CannotCommit', 'Abort', 'NeedsTransaction',
-    'Cursor', 'Static', 'Journal', 'Memory', 'Change', 'Log'
+    'Cursor', 'Journal', 'Memory', 'Change', 'Log'
 )
 
 class CannotCommit(RuntimeError): pass
@@ -23,10 +23,6 @@ class Cursor(object):
 
     __id__ = property(id)
 
-class Static(object):
-    __metaclass__ = ABCMeta
-    __slots__ = ()
-
 class Journal(object):
     __metaclass__ = ABCMeta
     __slots__ = ()
@@ -40,15 +36,6 @@ class Journal(object):
         """The journal this journal derives from."""
 
     @abstractmethod
-    def begin(self, nested):
-        """Nested journals must call self.source.begin(self)."""
-
-    @abstractmethod
-    def committed(self):
-        """The source must call this method after a successful
-        commit."""
-
-    @abstractmethod
     def make_journal(self):
         """Create a new journal with this journal as the source."""
 
@@ -57,41 +44,40 @@ class Journal(object):
         """Allocate a new state for cursor."""
 
     @abstractmethod
-    def read_unsaved(self, cursor):
-        """Return the read-only unsaved state for cursor."""
+    def readable_state(self, cursor):
+        """Return whatever state is readable for a cursor."""
 
     @abstractmethod
-    def read_saved(self, cursor):
-        """Return the read-only saved state for cursor."""
+    def original_state(self, cursor):
+        """Return the original state of the cursor.  This may or may
+        not be the same as the readable state."""
 
     @abstractmethod
-    def commit_changes(self, read, changed):
-        """Commit changes into the save-log."""
+    def writable_state(self, cursor):
+        """Return whatever state is writable for a cursor."""
 
     @abstractmethod
-    def write(self, cursor):
-        """Return a mutable state for cursor."""
-
-    @abstractmethod
-    def delete(self, cursor):
+    def delete_state(self, cursor):
         """Destroy the state associated with cursor."""
 
     @abstractmethod
-    def save_state(self, cursor):
-        """Add any unsaved state for cursor to the save-log."""
+    def rollback_state(self, cursor):
+        """Return a cursor to it's original state."""
 
     @abstractmethod
-    def unsaved(self):
-        """Produce an iterator over cursors with unsaved state."""
+    def commit_transaction(self, nested):
+        """Commit a journal into the write-log."""
+
+    @abstractmethod
+    def original(self):
+        """Iterate over (cursor, original-state) items in the
+        read-log"""
 
     @abstractmethod
     def changed(self):
-        """Iterate over saved changes."""
+        """Iterate over (cursor, original-state, changed-state) items
+        in the write-log."""
 
-    @abstractmethod
-    def read(self):
-        """Produce an iterator over (cursor, state) pairs in the
-        read-log."""
 
 def needs_transaction(*args, **kwargs):
     raise NeedsTransaction(
@@ -101,15 +87,14 @@ def needs_transaction(*args, **kwargs):
 class Memory(Journal):
     source = None
 
-    def read_unsaved(self, cursor):
-        return self.read_saved(cursor)
+    def original_state(self):
+        return self.readable_state(self)
 
-    write = needs_transaction
-    delete = needs_transaction
-    save_state = needs_transaction
-    unsaved = needs_transaction
+    writable_state = needs_transaction
+    delete_state = needs_transaction
+    rollback_state = needs_transaction
+    original = needs_transaction
     changed = needs_transaction
-    read = needs_transaction
 
 class Change(object):
     __metaclass__ = ABCMeta

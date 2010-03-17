@@ -20,6 +20,14 @@ class weakentry(ref):
     def __init__(self, cursor, id, state, callback):
         super(weakentry, self).__init__(cursor, callback)
 
+    def __iter__(self):
+        yield self.cursor
+        yield self.state
+
+    @property
+    def cursor(self):
+        return self()
+
 class log(Log):
     __slots__ = ('entries',)
 
@@ -57,20 +65,24 @@ class log(Log):
     def has_key(self, key):
         return key in self.entries
 
-    def get_cursor(self, key):
-        return self._get_entry(key).cursor
-
     def get(self, cursor, default=None):
         try:
             return self[cursor]
         except KeyError:
             return default
 
+    def cursor(self, key, default=None):
+        probe = self.entries.get(key, default)
+        return probe if probe is default else probe.cursor
+
+    def entry(self, key, default=None):
+        return self.entries.get(key, default)
+
     def allocate(self, cursor, state):
         if cursor in self:
             raise ValueError('already allocated', self._key(cursor), state)
         else:
-            self[cursor] = state
+            return self.__setitem__(cursor, state)
 
     def setdefault(self, cursor, state):
         try:
@@ -133,6 +145,12 @@ class weaklog(log):
             return entry
         else:
             raise KeyError, key
+
+    def entry(self, key, default=None):
+        probe = self.entries.get(key)
+        if probe and probe() is not None:
+            return probe
+        return default
 
     def has_key(self, key):
         try:

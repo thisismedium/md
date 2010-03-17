@@ -138,7 +138,7 @@ class tree(dict):
     def keys(self, *offsets):
         if not offsets:
             return list(self._index)
-        return list(self.keys(*offsets))
+        return list(self.iterkeys(*offsets))
 
     def values(self, *offsets):
         return list(self.itervalues(*offsets))
@@ -200,6 +200,53 @@ class MutableOrderedMap(OrderedMap, MutableMapping):
 
 @abc.implements(MutableOrderedMap)
 class omap(OrderedDict):
+
+    ## Extended iterators
+
+    def iterkeys(self, *offsets):
+        """Generate a list of all keys or keys in a certain range.
+        The offset semantics are the same as islice()."""
+
+        if not offsets:
+            return iter(self)
+        elif len(offsets) == 1:
+            start = None; (end,) = offsets
+        else:
+            (start, end) = offsets
+
+        if start is None:
+            ## One argument: assume it is "end".  Generate the range
+            ## [leftmost, end)
+            keys = self
+        else:
+            keys = it.dropwhile(lambda k: k != start, keys)
+
+        if end is None:
+            ## Generate the range [start, rightmost]
+            return keys
+        ## Generate the range [start, end)
+        return it.takewhile(lambda k: k != end, keys)
+
+    def itervalues(self, *offsets):
+        if not offsets:
+            return (self[k] for k in self)
+        return (self[k] for k in self.iterkeys(*offsets))
+
+    def iteritems(self, *offsets):
+        if not offsets:
+            return ((k, self[k]) for k in self)
+        return ((k, self[k]) for k in self.iterkeys(*offsets))
+
+    def keys(self, *offsets):
+        if not offsets:
+            return list(self)
+        return list(self.iterkeys(*offsets))
+
+    def values(self, *offsets):
+        return list(self.itervalues(*offsets))
+
+    def items(self, *offsets):
+        return list(self.iteritems(*offsets))
 
     ## Sequence
 

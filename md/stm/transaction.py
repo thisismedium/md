@@ -9,24 +9,24 @@ __all__ = (
     'initialize', 'current_journal', 'current_memory',
     'allocate', 'readable', 'writable', 'delete',
     'use', 'transaction', 'transactionally',
-    'save', 'rollback', 'commit', 'abort',
-    'saved', 'unsaved'
+    'rollback', 'commit', 'abort',
+    'changed'
 )
 
 
 ### Transasctional Data Type Operations
 
 def allocate(cursor, state):
-    return alloc(current_journal(), cursor, state)
+    return current_journal().allocate(cursor, state)
 
 def readable(cursor):
-    return read_unsaved(current_journal(), cursor)
+    return readable_state(current_journal(), cursor)
 
 def writable(cursor):
-    return write(current_journal(), cursor)
+    return writable_state(current_journal(), cursor)
 
 def delete(cursor):
-    return dealloc(current_journal(), cursor)
+    current_journal().delete_state(cursor)
 
 
 ### Transactions
@@ -36,12 +36,10 @@ def use(mem=None):
     return current_journal(mem or memory())
 
 @contextmanager
-def transaction(name='*nested*', autocommit=True, autosave=True):
+def transaction(name='*nested*', autocommit=True):
     try:
         with current_journal(current_journal().make_journal(name)):
             yield
-            if autosave:
-                autosave() if callable(autosave) else save()
             if autocommit:
                 autocommit() if callable(autocommit) else commit()
     except Abort:
@@ -50,36 +48,28 @@ def transaction(name='*nested*', autocommit=True, autosave=True):
 def transactionally(proc, *args, **kwargs):
     limit = kwargs.pop('__attempts__', 3)
     autocommit = kwargs.pop('autocommit', True)
-    autosave = kwargs.pop('autosave', True)
 
     for attempt in xrange(limit):
         try:
-            with transaction(autocommit=autocommit, autosave=autosave):
+            with transaction(autocommit=autocommit):
                 return proc(*args, **kwargs)
         except CannotCommit as exc:
             pass
     raise exc
 
-def save(what=None, force=False):
-    change_state(save_state, current_journal(), what or unsaved(), force)
-    return what
-
 def commit(journal=None):
     journal = journal or current_journal()
-    return commit_changes(journal.source, journal)
+    return commit_transaction(journal.source, journal)
 
 def rollback(what=None):
-    change_state(revert_state, current_journal(), what or unsaved())
+    change_state(current_journal().rollback_state, what or changed())
     return what
 
 def abort():
     raise Abort
 
-def saved():
+def changed():
     return (c.cursor for c in current_journal().changed())
-
-def unsaved():
-    return current_journal().unsaved()
 
 
 ### Journal
