@@ -13,7 +13,7 @@ __all__ = tuple(collections.__all__) + (
     'keys', 'values', 'items', 'chain_items',
     'update', 'updated',
     'sentinal', 'Sentinal', 'Undefined',
-    'adapt'
+    'AdaptationFailure', 'adapt'
 )
 
 
@@ -90,6 +90,9 @@ Undefined = sentinal('<undefined>', nonzero=False)
 
 ### Adaptation
 
+class AdaptationFailure(TypeError, NotImplementedError):
+    pass
+
 def adapt(obj, cls, default=None):
     """Adapt (cast) obj to cls.
 
@@ -114,12 +117,12 @@ def adapt(obj, cls, default=None):
         value = adapt and adapt(obj)
         if value is not None:
             return value
-    except TypeError:
-        pass
+    except TypeError as exc:
+        print 'Failed to __adapt__', repr(obj), exc
 
     if default is not None:
         return default
 
-    raise ValueError('Cannot adapt %r. %r does not implement %r.' % (
+    raise AdaptationFailure('Cannot adapt %r. %r does not implement %r.' % (
         obj, type(obj), cls
     ))
