@@ -150,8 +150,7 @@ if MONKEY_PATCH:
     try:
         RealThread = threading.RealThread
     except AttributeError:
-        RealThread = threading.Thread
-        threading.RealThread = RealThread
+        threading.RealThread = RealThread = threading.Thread
 else:
     RealThread = threading.Thread
 
@@ -163,15 +162,19 @@ class Thread(RealThread):
         self.localized = LOCAL.localize()
         RealThread.start(self)
 
+def patch_subclass(name):
+    new = 'Real%s' % name
+    try:
+        getattr(threading, new)
+    except AttributeError:
+        orig = getattr(threading, name)
+        setattr(threading, new, orig)
+        setattr(threading, name, type(name, (Thread, orig), {}))
+
 if MONKEY_PATCH:
     threading.Thread = Thread
-    try:
-        threading._RealDummyThread
-    except AttributeError:
-        RealDummyThread = threading._DummyThread
-        threading._RealDummyThread = RealDummyThread
-        class DummyThread(Thread, RealDummyThread): pass
-        threading._DummyThread = DummyThread
+    patch_subclass('_DummyThread')
+    patch_subclass('_Timer')
 
 def parent_environment(missing):
     t = threading.currentThread()
