@@ -8,11 +8,12 @@ import copy, itertools as it, functools as fn, contextlib as ctx
 import collections; from collections import *
 
 __all__ = tuple(collections.__all__) + (
-    'partial', 'wraps', 'closing',
-    'chain', 'ichain', 'islice', 'imap', 'takewhile',
+    'partial', 'wraps', 'closing', 'contextmanager',
+    'chain', 'ichain', 'islice', 'izip', 'izipl', 'imap', 'takewhile',
+    'extend',
     'keys', 'values', 'items', 'chain_items',
-    'update', 'updated',
-    'sentinal', 'Sentinal', 'Undefined',
+    'update', 'updated', 'setdefault',
+    'base', 'sentinal', 'Sentinal', 'Undefined',
     'AdaptationFailure', 'adapt'
 )
 
@@ -22,6 +23,7 @@ __all__ = tuple(collections.__all__) + (
 partial = fn.partial
 wraps = fn.wraps
 closing = ctx.closing
+contextmanager = ctx.contextmanager
 
 
 ### Sequences
@@ -29,10 +31,16 @@ closing = ctx.closing
 chain = it.chain
 imap = it.imap
 islice = it.islice
+izip = it.izip
+izipl = it.izip_longest
 takewhile = it.takewhile
 
 def ichain(seq):
     return (x for s in seq for x in s)
+
+def extend(obj, seq):
+    obj.extend(seq)
+    return obj
 
 
 ### Mapping
@@ -60,8 +68,16 @@ def update(obj, *args, **kwargs):
 def updated(obj, *args, **kw):
     return update(copy.copy(obj), *args, **kw)
 
+def setdefault(obj, **kw):
+    for (key, val) in kw.iteritems():
+        obj.setdefault(key, val)
+    return obj
+
 
 ### Types
+
+def base(cls):
+    return cls.__bases__[0]
 
 class Sentinal(object):
     __slots__ = ('nonzero', )
@@ -118,7 +134,7 @@ def adapt(obj, cls, default=None):
         if value is not None:
             return value
     except TypeError as exc:
-        print 'Failed to __adapt__', repr(obj), exc
+        pass
 
     if default is not None:
         return default

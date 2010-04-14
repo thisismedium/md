@@ -82,6 +82,11 @@ class tree(dict):
         dict.update(self, state)
         self._index = [k for (k, _) in state]
 
+    @classmethod
+    def __adapt__(cls, obj):
+        if isinstance(obj, coll.Iterable):
+            return cls(obj)
+
     ## MutableMapping / dict
 
     # __len__
@@ -201,6 +206,11 @@ class MutableOrderedMap(OrderedMap, MutableMapping):
 @abc.implements(MutableOrderedMap)
 class omap(OrderedDict):
 
+    @classmethod
+    def __adapt__(cls, obj):
+        if isinstance(obj, (coll.Sequence, coll.Iterable)):
+            return cls(obj)
+
     ## Extended iterators
 
     def iterkeys(self, *offsets):
@@ -219,7 +229,7 @@ class omap(OrderedDict):
             ## [leftmost, end)
             keys = self
         else:
-            keys = it.dropwhile(lambda k: k != start, keys)
+            keys = it.dropwhile(lambda k: k != start, self)
 
         if end is None:
             ## Generate the range [start, rightmost]
@@ -259,7 +269,7 @@ class omap(OrderedDict):
 
 ### Structure
 
-def struct(name, fields, weak=False, metaclass=None):
+def struct(name, fields, weak=False, base=object, metaclass=None):
     """Create a structure class called name with the given fields.
     This works like a namedtuple, but uses __slots__.
 
@@ -288,12 +298,12 @@ def struct(name, fields, weak=False, metaclass=None):
     new = '\n        '.join('self.%s = %s' % (f, f) for f in fields)
 
     template = '''
-class %(name)s(object):
+class %(name)s(base):
     __metaclass__ = metaclass
     __slots__ = %(slots)r
 
     def __new__(_cls, %(args)s):
-        self = object.__new__(_cls)
+        self = base.__new__(_cls)
         %(new)s
         return self
 
@@ -328,7 +338,7 @@ class %(name)s(object):
         '__name__': 'struct_%s' % name,
         '__builtins__': {
             'metaclass': (metaclass or StructType),
-            'object': object,
+            'base': base,
             'getattr': getattr,
             'tuple': tuple,
             'type': type,
