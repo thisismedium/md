@@ -11,7 +11,7 @@ __all__ = tuple(collections.__all__) + (
     'partial', 'wraps', 'closing', 'contextmanager',
     'chain', 'ichain', 'islice', 'izip', 'izipl', 'imap', 'takewhile',
     'extend',
-    'keys', 'values', 'items', 'chain_items',
+    'ddict', 'keys', 'values', 'items', 'chain_items',
     'update', 'updated', 'setdefault',
     'base', 'sentinal', 'Sentinal', 'Undefined',
     'AdaptationFailure', 'adapt'
@@ -44,6 +44,8 @@ def extend(obj, seq):
 
 
 ### Mapping
+
+ddict = collections.defaultdict
 
 def keys(obj):
     if isinstance(obj, Mapping):
